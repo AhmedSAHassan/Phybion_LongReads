@@ -1,0 +1,32 @@
+2024-11-25 14:46:14,771 NanoPlot 1.44.0 started with arguments Namespace(threads=12, verbose=False, store=False, raw=False, huge=False, outdir='nanoplot/PAU84062_pass_FAST_barcode05', no_static=False, prefix='', tsv_stats=False, only_report=False, info_in_report=False, maxlength=None, minlength=None, drop_outliers=False, downsample=None, loglength=False, percentqual=False, alength=False, minqual=None, runtime_until=None, readtype='1D', barcoded=False, no_supplementary=False, color='#4CB391', colormap='Greens', format=['png'], plots=['kde', 'dot'], legacy=None, listcolors=False, listcolormaps=False, no_N50=False, N50=False, title=None, font_scale=1, dpi=100, hide_stats=False, fastq=None, fasta=None, fastq_rich=['FASTQ/PAU84062_pass_FAST_barcode05.fastq.gz'], fastq_minimal=None, summary=None, bam=None, ubam=None, cram=None, pickle=None, feather=None, path='nanoplot/PAU84062_pass_FAST_barcode05/')
+2024-11-25 14:46:14,771 Python version is: 3.12.3 | packaged by conda-forge | (main, Apr 15 2024, 18:50:49) [Clang 16.0.6 ]
+2024-11-25 15:13:08,137 Nanoget: Gathered all metrics of 12962320 reads
+2024-11-25 15:13:16,647 Calculated statistics
+2024-11-25 15:13:16,647 Using sequenced read lengths for plotting.
+2024-11-25 15:13:17,297 NanoPlot:  Valid color #4CB391.
+2024-11-25 15:13:17,297 NanoPlot:  Valid colormap Greens.
+2024-11-25 15:13:17,968 NanoPlot:  Creating length plots for Read length.
+2024-11-25 15:13:17,974 NanoPlot:  Using 12962320 reads maximum of 30579bp.
+2024-11-25 15:13:19,202 Saved nanoplot/PAU84062_pass_FAST_barcode05/WeightedHistogramReadlength  as png (or png for --legacy)
+2024-11-25 15:13:20,258 Saved nanoplot/PAU84062_pass_FAST_barcode05/WeightedLogTransformed_HistogramReadlength  as png (or png for --legacy)
+2024-11-25 15:13:21,045 Saved nanoplot/PAU84062_pass_FAST_barcode05/Non_weightedHistogramReadlength  as png (or png for --legacy)
+2024-11-25 15:13:21,884 Saved nanoplot/PAU84062_pass_FAST_barcode05/Non_weightedLogTransformed_HistogramReadlength  as png (or png for --legacy)
+2024-11-25 15:13:23,971 Saved nanoplot/PAU84062_pass_FAST_barcode05/Yield_By_Length  as png (or png for --legacy)
+2024-11-25 15:13:23,971 Created length plots
+2024-11-25 15:13:24,273 NanoPlot: Creating Read lengths vs Average read quality plots using 12962320 reads.
+2024-11-25 15:13:26,492 Saved nanoplot/PAU84062_pass_FAST_barcode05/LengthvsQualityScatterPlot_dot  as png (or png for --legacy)
+2024-11-25 15:13:27,794 Saved nanoplot/PAU84062_pass_FAST_barcode05/LengthvsQualityScatterPlot_kde  as png (or png for --legacy)
+2024-11-25 15:13:27,795 Created LengthvsQual plot
+2024-11-25 15:13:27,795 Nanoplotter: Creating heatmap of reads per channel using 12962320 reads.
+2024-11-25 15:13:28,576 Saved nanoplot/PAU84062_pass_FAST_barcode05/ActivityMap_ReadsPerChannel  as png (or png for --legacy)
+2024-11-25 15:13:28,577 Created spatialheatmap for succesfull basecalls.
+2024-11-25 15:13:28,577 Nanoplotter: Creating timeplots using 12962320 (full) or 10000 (subsampled dataset) reads.
+2024-11-25 15:13:31,958 Saved nanoplot/PAU84062_pass_FAST_barcode05/CumulativeYieldPlot_Gigabases  as png (or png for --legacy)
+2024-11-25 15:13:32,960 Saved nanoplot/PAU84062_pass_FAST_barcode05/CumulativeYieldPlot_NumberOfReads  as png (or png for --legacy)
+2024-11-25 15:13:34,378 Saved nanoplot/PAU84062_pass_FAST_barcode05/NumberOfReads_Over_Time  as png (or png for --legacy)
+2024-11-25 15:13:35,401 Saved nanoplot/PAU84062_pass_FAST_barcode05/ActivePores_Over_Time  as png (or png for --legacy)
+2024-11-25 15:13:36,288 Saved nanoplot/PAU84062_pass_FAST_barcode05/TimeLengthViolinPlot  as png (or png for --legacy)
+2024-11-25 15:13:36,995 Saved nanoplot/PAU84062_pass_FAST_barcode05/TimeQualityViolinPlot  as png (or png for --legacy)
+2024-11-25 15:13:37,039 Created timeplots.
+2024-11-25 15:13:37,040 Writing html report.
+2024-11-25 15:13:37,053 Finished!

@@ -1,0 +1,32 @@
+2024-11-25 11:49:27,700 NanoPlot 1.44.0 started with arguments Namespace(threads=12, verbose=False, store=False, raw=False, huge=False, outdir='nanoplot/', no_static=False, prefix='', tsv_stats=False, only_report=False, info_in_report=False, maxlength=None, minlength=None, drop_outliers=False, downsample=None, loglength=False, percentqual=False, alength=False, minqual=None, runtime_until=None, readtype='1D', barcoded=False, no_supplementary=False, color='#4CB391', colormap='Greens', format=['png'], plots=['kde', 'dot'], legacy=None, listcolors=False, listcolormaps=False, no_N50=False, N50=False, title=None, font_scale=1, dpi=100, hide_stats=False, fastq=None, fasta=None, fastq_rich=['./PAU84062_pass_FAST_barcode01.fastq.gz'], fastq_minimal=None, summary=None, bam=None, ubam=None, cram=None, pickle=None, feather=None, path='nanoplot/')
+2024-11-25 11:49:27,700 Python version is: 3.12.3 | packaged by conda-forge | (main, Apr 15 2024, 18:50:49) [Clang 16.0.6 ]
+2024-11-25 12:02:15,133 Nanoget: Gathered all metrics of 11427053 reads
+2024-11-25 12:02:22,586 Calculated statistics
+2024-11-25 12:02:22,586 Using sequenced read lengths for plotting.
+2024-11-25 12:02:23,170 NanoPlot:  Valid color #4CB391.
+2024-11-25 12:02:23,170 NanoPlot:  Valid colormap Greens.
+2024-11-25 12:02:23,878 NanoPlot:  Creating length plots for Read length.
+2024-11-25 12:02:23,884 NanoPlot:  Using 11427053 reads maximum of 130874bp.
+2024-11-25 12:02:38,023 Saved nanoplot/WeightedHistogramReadlength  as png (or png for --legacy)
+2024-11-25 12:02:38,909 Saved nanoplot/WeightedLogTransformed_HistogramReadlength  as png (or png for --legacy)
+2024-11-25 12:02:39,760 Saved nanoplot/Non_weightedHistogramReadlength  as png (or png for --legacy)
+2024-11-25 12:02:40,616 Saved nanoplot/Non_weightedLogTransformed_HistogramReadlength  as png (or png for --legacy)
+2024-11-25 12:02:42,767 Saved nanoplot/Yield_By_Length  as png (or png for --legacy)
+2024-11-25 12:02:42,768 Created length plots
+2024-11-25 12:02:43,038 NanoPlot: Creating Read lengths vs Average read quality plots using 11427053 reads.
+2024-11-25 12:02:45,148 Saved nanoplot/LengthvsQualityScatterPlot_dot  as png (or png for --legacy)
+2024-11-25 12:02:46,498 Saved nanoplot/LengthvsQualityScatterPlot_kde  as png (or png for --legacy)
+2024-11-25 12:02:46,498 Created LengthvsQual plot
+2024-11-25 12:02:46,499 Nanoplotter: Creating heatmap of reads per channel using 11427053 reads.
+2024-11-25 12:02:47,383 Saved nanoplot/ActivityMap_ReadsPerChannel  as png (or png for --legacy)
+2024-11-25 12:02:47,384 Created spatialheatmap for succesfull basecalls.
+2024-11-25 12:02:47,384 Nanoplotter: Creating timeplots using 11427053 (full) or 10000 (subsampled dataset) reads.
+2024-11-25 12:02:49,782 Saved nanoplot/CumulativeYieldPlot_Gigabases  as png (or png for --legacy)
+2024-11-25 12:02:50,703 Saved nanoplot/CumulativeYieldPlot_NumberOfReads  as png (or png for --legacy)
+2024-11-25 12:02:52,024 Saved nanoplot/NumberOfReads_Over_Time  as png (or png for --legacy)
+2024-11-25 12:02:53,058 Saved nanoplot/ActivePores_Over_Time  as png (or png for --legacy)
+2024-11-25 12:02:53,833 Saved nanoplot/TimeLengthViolinPlot  as png (or png for --legacy)
+2024-11-25 12:02:54,609 Saved nanoplot/TimeQualityViolinPlot  as png (or png for --legacy)
+2024-11-25 12:02:54,649 Created timeplots.
+2024-11-25 12:02:54,649 Writing html report.
+2024-11-25 12:02:54,687 Finished!
