@@ -4,6 +4,31 @@ output: html_document
 date: "2024-11-26"
 ---
 
+```{r}
+library(knitr)
+
+opts_chunk$set(
+  fig.path = paste0('./figures/'),
+  fig.align = 'center',
+  fig.show = 'asis',
+  eval = TRUE,
+  fig.width = 10,
+  fig.height = 7,
+  tidy = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  size = 'small',
+  comment = "##",
+  echo = TRUE,
+  results = 'markup',
+  dev = c("png", "pdf")
+)
+options(replace.assign = TRUE,
+        width = 80)
+
+```
+
+
 # loading the libraries
 
 ```{r}
@@ -60,6 +85,7 @@ library("quantiseqr")
 library("immunedeconv")
 library("tibble")
 library("tidyr")
+library("ComplexHeatmap")
 ```
 
 # loading the coldata and count matrix
@@ -445,7 +471,7 @@ gtl_pilot_LR <- GeneTonicList(
 
 ## Running GeneTonic
 
-```{r}
+```{r, eval=FALSE}
 GeneTonic(gtl = gtl_pilot_LR)
 ```
 
