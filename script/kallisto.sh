@@ -1,5 +1,11 @@
 #Kallisto
 
+
+#index
+
+ kallisto index -i index.idx reference/gencode.v47.transcripts.fa.gz
+
+
 For sample in FASTQ/*.fastq-gz; do
     sample_name=$(basename "$sample" ".fastq.gz")
     echo "Working on $sample..."
