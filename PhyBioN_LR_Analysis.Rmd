@@ -10,7 +10,6 @@ output:
 # Loading the libraries
 
 ```{r setup, include=FALSE}
-
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
@@ -49,35 +48,31 @@ library("GeneTonic")
 library("tibble")
 library("Biostrings")
 library("stringr")
-
 ```
 
 # Loading the dataset
 
 ## Loading the long read -gene level- data
 ```{r}
-
 dds_LR <- readRDS("~/Phybion_Pilot_LR/dds_LR.RDS")
 
 # Variance stabilizing transformation
 
 vsd_LR <- vst(dds_LR)
-
 ```
 
 ## Loading LR - Transcript level- data
 
 ```{r}
-
 colData <- read_excel("./coldata_phybion_pilot_LR.xlsx")
 
 colData <- as.data.frame(colData)
 
 
-LR_metadata<- colData
+LR_metadata <- colData
 
 
-LR_Tx_counts<- read.table(file ="./Isoquant/OUT/OUT.transcript_model_grouped_counts.tsv")
+LR_Tx_counts <- read.table(file = "./Isoquant/OUT/OUT.transcript_model_grouped_counts.tsv")
 
 # Transcript counts
 # Removing un-annotated transcripts since they cannot be used for diff splice analysis
@@ -86,24 +81,23 @@ LR_Tx_counts_filtered <- LR_Tx_counts[!grepl("^transcript", LR_Tx_counts$V1), ]
 
 # Gencode to Ensemble id
 
-LR_Tx_counts_filtered[,1]<- gsub("\\..*", "", LR_Tx_counts_filtered[,1])
+LR_Tx_counts_filtered[, 1] <- gsub("\\..*", "", LR_Tx_counts_filtered[, 1])
 
 # assigning the transcripts id to the rownames
 
-rownames(LR_Tx_counts_filtered)<- LR_Tx_counts_filtered[,1]
-LR_Tx_counts_filtered<- LR_Tx_counts_filtered[,-1]
+rownames(LR_Tx_counts_filtered) <- LR_Tx_counts_filtered[, 1]
+LR_Tx_counts_filtered <- LR_Tx_counts_filtered[, -1]
 
 
-rownames(LR_Tx_counts)<- LR_Tx_counts[,1]
-LR_Tx_counts<- LR_Tx_counts[,-1]
+rownames(LR_Tx_counts) <- LR_Tx_counts[, 1]
+LR_Tx_counts <- LR_Tx_counts[, -1]
 
-LR_Tx_counts<- LR_Tx_counts[rowSums(LR_Tx_counts) > 6,]
+LR_Tx_counts <- LR_Tx_counts[rowSums(LR_Tx_counts) > 6, ]
 # naming the columns
 
-colnames(LR_Tx_counts_filtered)<- c("0Gy-F", "0Gy-A", "0Gy-S", "4Gy-F", "4Gy-A", "4Gy-S")
+colnames(LR_Tx_counts_filtered) <- c("0Gy-F", "0Gy-A", "0Gy-S", "4Gy-F", "4Gy-A", "4Gy-S")
 
-colnames(LR_Tx_counts)<- c("0Gy-F", "0Gy-A", "0Gy-S", "4Gy-F", "4Gy-A", "4Gy-S")
-
+colnames(LR_Tx_counts) <- c("0Gy-F", "0Gy-A", "0Gy-S", "4Gy-F", "4Gy-A", "4Gy-S")
 ```
 
 # Data exploration
@@ -111,47 +105,50 @@ colnames(LR_Tx_counts)<- c("0Gy-F", "0Gy-A", "0Gy-S", "4Gy-F", "4Gy-A", "4Gy-S")
 ## PCA plot
 
 ```{r}
-
-pca_plot_LR <- plotPCA(vsd_LR, 
+pca_plot_LR <- plotPCA(vsd_LR,
                        intgroup = c("Donors", "Dose"),
-                       returnData = TRUE)
+                       returnData = TRUE
+)
 
 percentVar <- round(100 * attr(pca_plot_LR, "percentVar"))
 
 
 
 ggpt <- theme_bw() +
-    theme(
-       axis.title.x=element_text(size=rel(1.6)),
-        axis.title.y=element_text(size=rel(1.6)),
-        axis.text.x=element_text(size=rel(1.6)),
-        axis.text.y=element_text(size=rel(1.6)),
-        strip.text.x=element_text(size=rel(1.6)),
-        strip.text.y=element_text(size=rel(1.6)),
-        legend.text=element_text(size=rel(1.4)),
-        legend.title=element_text(size=rel(1.4)),
-        plot.title=element_text(size=rel(1.6)))
-
-
-PCA_LR<- ggplot(pca_plot_LR, 
-                aes(x = PC1, y = PC2, color = Donors)) +
-  geom_point(size = 3) +
-  scale_shape_manual(values = c(16, 17)) + 
-  xlab(paste0("PC1: ", percentVar[1], "% variance")) +
-  ylab(paste0("PC2: ", percentVar[2], "% variance")) +
-  theme_minimal() + theme(
-    plot.title = element_text(size = 17), 
-    axis.title.x = element_text(size = 15), 
-    axis.title.y = element_text(size = 15), 
-    axis.text = element_text(size = 13),   
-    legend.text = element_text(size = 13), 
-    legend.title = element_text(size = 15) 
+  theme(
+    axis.title.x = element_text(size = rel(1.6)),
+    axis.title.y = element_text(size = rel(1.6)),
+    axis.text.x = element_text(size = rel(1.6)),
+    axis.text.y = element_text(size = rel(1.6)),
+    strip.text.x = element_text(size = rel(1.6)),
+    strip.text.y = element_text(size = rel(1.6)),
+    legend.text = element_text(size = rel(1.4)),
+    legend.title = element_text(size = rel(1.4)),
+    plot.title = element_text(size = rel(1.6))
   )
 
-PCA_LR+ggpt
+
+PCA_LR <- ggplot(
+  pca_plot_LR,
+  aes(x = PC1, y = PC2, color = Donors)
+) +
+  geom_point(size = 3) +
+  scale_shape_manual(values = c(16, 17)) +
+  xlab(paste0("PC1: ", percentVar[1], "% variance")) +
+  ylab(paste0("PC2: ", percentVar[2], "% variance")) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 17),
+    axis.title.x = element_text(size = 15),
+    axis.title.y = element_text(size = 15),
+    axis.text = element_text(size = 13),
+    legend.text = element_text(size = 13),
+    legend.title = element_text(size = 15)
+  )
+
+PCA_LR + ggpt
 
 # There is a strong interdonor variation which has to be accounted for in the design before DEA
-
 ```
 
 # EdgeR_DEA
@@ -161,25 +158,29 @@ PCA_LR+ggpt
 ```{r}
 gene_mat <- counts(dds_LR)
 
-LR_samples <- data.frame(sample_id = LR_metadata$sample_id,
-                         group = LR_metadata$Dose,
-                         Donors = LR_metadata$Donors)
+LR_samples <- data.frame(
+  sample_id = LR_metadata$sample_id,
+  group = LR_metadata$Dose,
+  Donors = LR_metadata$Donors
+)
 
 knitr::kable(LR_samples)
 
 # Create DGEList
-y_DEA <- DGEList(counts = gene_mat, 
-                 samples = LR_samples)
+y_DEA <- DGEList(
+  counts = gene_mat,
+  samples = LR_samples
+)
 
 keep <- filterByExpr(y_DEA)
-y_DEA <- y_DEA[keep, keep.lib.sizes=FALSE]
+y_DEA <- y_DEA[keep, keep.lib.sizes = FALSE]
 
 # TMM normalization
 y_DEA <- normLibSizes(y_DEA)
 
 # Define factors
 Donor <- factor(LR_metadata$Donors)
-Treatment <- factor(LR_metadata$Dose) 
+Treatment <- factor(LR_metadata$Dose)
 
 # Design matrix including donor
 design <- model.matrix(~ Donor + Treatment)
@@ -208,7 +209,7 @@ lrt_gene <- glmQLFTest(fit_gene, coef = "Treatment4Gy")
 edger_gene_res <- topTags(lrt_gene, n = Inf)
 
 
-sig_genes_edger <- edger_gene_res$table[edger_gene_res$table$FDR<=0.05,]
+sig_genes_edger <- edger_gene_res$table[edger_gene_res$table$FDR <= 0.05, ]
 
 # plot raw pvalues histogram
 
@@ -222,14 +223,12 @@ sig_genes_edger$SYMBOL <- mapIds(
   keytype = "ENSEMBL",
   multiVals = "first"
 )
-
 ```
 
 ## Volcanoplot
 
 ```{r}
-
-de_res<- edger_gene_res$table
+de_res <- edger_gene_res$table
 
 top_genes <- de_res[order(de_res$FDR), ][1:10, ]
 top_genes$SYMBOL <- mapIds(
@@ -243,7 +242,8 @@ top_genes$SYMBOL <- mapIds(
 
 # Define up/down/NS
 de_res$diffexpressed <- factor(ifelse(de_res$FDR < 0.05 & de_res$logFC > 0, "Up",
-                                      ifelse(de_res$FDR < 0.05 & de_res$logFC < 0, "Down", "NS")))
+                                      ifelse(de_res$FDR < 0.05 & de_res$logFC < 0, "Down", "NS")
+))
 
 # Volcano plot
 g <- ggplot(de_res, aes(x = logFC, y = -log10(FDR), color = diffexpressed)) +
@@ -255,7 +255,7 @@ g <- ggplot(de_res, aes(x = logFC, y = -log10(FDR), color = diffexpressed)) +
     color = "black"
   ) +
   geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "grey") +
-  xlim(c(-14,14)) +
+  xlim(c(-14, 14)) +
   xlab("log2 fold change") +
   ylab("-log10 FDR") +
   scale_color_manual(values = c("blue", "grey", "red")) +
@@ -264,26 +264,24 @@ g <- ggplot(de_res, aes(x = logFC, y = -log10(FDR), color = diffexpressed)) +
   ggpt
 
 g
-
-
 ```
 ## Creating gene plotting function
 
 ```{r}
-
-plot_gene_modified <- function(dds, gene, intgroup = "condition", assay = "counts", 
-                               annotation_obj = NULL, normalized = TRUE, transform = TRUE, 
-                               labels_display = FALSE, labels_repel = TRUE, plot_type = "auto", 
+plot_gene_modified <- function(dds, gene, intgroup = "condition", assay = "counts",
+                               annotation_obj = NULL, normalized = TRUE, transform = TRUE,
+                               labels_display = FALSE, labels_repel = TRUE, plot_type = "auto",
                                return_data = FALSE, color_by = "Donors") {
-  
   plot_type <- match.arg(plot_type, c("auto", "jitteronly", "boxplot", "violin", "sina"))
   
   if (!(all(intgroup %in% colnames(colData(dds))))) {
     stop("`intgroup` not found in the colData slot of the dds object.")
   }
   
-  df <- get_expr_values(de_container  = dds, gene = gene, intgroup = intgroup, 
-                              assay = assay, normalized = normalized)
+  df <- get_expr_values(
+    de_container = dds, gene = gene, intgroup = intgroup,
+    assay = assay, normalized = normalized
+  )
   df$sample_id <- rownames(df)
   
   # Add Donors column if it exists
@@ -308,9 +306,9 @@ plot_gene_modified <- function(dds, gene, intgroup = "condition", assay = "count
     return(df)
   }
   
-  p <- ggplot(df, aes(x = .data$plotby, y = .data$exp_value, col = .data[[color_by]])) + 
-    scale_x_discrete(name = "") + 
-    scale_color_discrete(name = "Experimental\ngroup") + 
+  p <- ggplot(df, aes(x = .data$plotby, y = .data$exp_value, col = .data[[color_by]])) +
+    scale_x_discrete(name = "") +
+    scale_color_discrete(name = "Experimental\ngroup") +
     theme_bw()
   
   jit_pos <- position_jitter(width = 0.2, height = 0, seed = 42)
@@ -321,16 +319,17 @@ plot_gene_modified <- function(dds, gene, intgroup = "condition", assay = "count
   # Display labels if required
   if (labels_display) {
     if (labels_repel) {
-      p <- p + ggrepel::geom_text_repel(aes(label = .data$sample_id), 
-                                        min.segment.length = 0, position = jit_pos)
+      p <- p + ggrepel::geom_text_repel(aes(label = .data$sample_id),
+                                        min.segment.length = 0, position = jit_pos
+      )
     } else {
       p <- p + geom_text(aes(label = .data$sample_id), hjust = -0.1, vjust = 0.1, position = jit_pos)
     }
   }
   
   # Add a connected mean line across all groups
-#  p <- p + stat_summary(fun = mean, geom = "line", aes(group = 1), 
- #                       color = "grey80", linewidth = 0.8)
+  #  p <- p + stat_summary(fun = mean, geom = "line", aes(group = 1),
+  #                       color = "grey80", linewidth = 0.8)
   
   y_label <- if (assay == "counts" & normalized) {
     "Normalized counts"
@@ -352,78 +351,81 @@ plot_gene_modified <- function(dds, gene, intgroup = "condition", assay = "count
   
   return(p)
 }
-
 ```
 
 
 ## Checking the gene pattern across doses
 
 ```{r}
-
 anno_df <- get_annotation_orgdb(
   de_container = dds_LR,
   orgdb_package = "org.Hs.eg.db",
-  id_type = "ENSEMBL")
+  id_type = "ENSEMBL"
+)
 
 
-gene_plot<- plot_gene_modified(
-  dds= dds_LR,
+gene_plot <- plot_gene_modified(
+  dds = dds_LR,
   gene = c("ENSG00000124762"),
   intgroup = "Dose",
-  annotation_obj = anno_df)+ ggpt 
+  annotation_obj = anno_df
+) + ggpt
 
 gene_plot
 
-#ggsave("cd83.png", plot = gene_plot, width = 8, height = 5, dpi = 400)
-
-
+# ggsave("cd83.png", plot = gene_plot, width = 8, height = 5, dpi = 400)
 ```
 
 # plotting tx
 
 ```{r}
-LR_Tx_counts_full<- read.table(file = "./Isoquant/OUT/OUT.transcript_model_grouped_counts.tsv")
+LR_Tx_counts_full <- read.table(file = "./Isoquant/OUT/OUT.transcript_model_grouped_counts.tsv")
 
 tx_mat <- LR_Tx_counts_full
 rownames(tx_mat) <- tx_mat$V1
 tx_mat <- tx_mat[, -1]
 
-colnames(tx_mat)<- c("0Gy-F", "0Gy-A", "0Gy-S", "4Gy-F", "4Gy-A", "4Gy-S")
+colnames(tx_mat) <- c("0Gy-F", "0Gy-A", "0Gy-S", "4Gy-F", "4Gy-A", "4Gy-S")
 
 
-dds_tx <- DESeqDataSetFromMatrix(countData = tx_mat ,
-                                 colData = LR_metadata,
-                                 design = ~ Dose + Donors)
+dds_tx <- DESeqDataSetFromMatrix(
+  countData = tx_mat,
+  colData = LR_metadata,
+  design = ~ Dose + Donors
+)
 
-#ENST00000440815 ENST00000325568
+# ENST00000440815 ENST00000325568
 
 plot_gene_modified(
-  dds= dds_tx,
+  dds = dds_tx,
   gene = c("ENST00000325568.9"),
   intgroup = "Dose",
-  annotation_obj = anno_df) +
+  annotation_obj = anno_df
+) +
   labs(
-    title = "IL-32 - ENST00000325568")+ggpt
+    title = "IL-32 - ENST00000325568"
+  ) + ggpt
 ```
 
 ## transcript level DEA
 
 ```{r}
-
 tx_mat <- LR_Tx_counts
 
-y_DEA_tx <- DGEList(counts = tx_mat, 
-                    samples = LR_samples)
+y_DEA_tx <- DGEList(
+  counts = tx_mat,
+  samples = LR_samples
+)
 
 keep <- filterByExpr(y_DEA_tx)
-y_DEA_tx <- y_DEA_tx[keep,,keep.lib.sizes=FALSE]
+y_DEA_tx <- y_DEA_tx[keep, , keep.lib.sizes = FALSE]
 
 # TMM normalization
 y_DEA_tx <- normLibSizes(y_DEA_tx)
 
 # Define factors
 Donor <- factor(LR_metadata$Donors)
-Treatment <- factor(LR_metadata$Dose)  
+Treatment <- factor(LR_metadata$Dose)
 
 # Design matrix including donor
 design <- model.matrix(~ Donor + Treatment)
@@ -452,7 +454,7 @@ lrt_tx <- glmQLFTest(fit_tx, coef = "Treatment4Gy")
 edger_Tx_res <- topTags(lrt_tx, n = Inf)
 
 
-sig_tx<- edger_Tx_res$table[edger_Tx_res$table$FDR <= 0.05,]
+sig_tx <- edger_Tx_res$table[edger_Tx_res$table$FDR <= 0.05, ]
 
 # Filter rows starting with "transcript"
 sig_novel_tx <- sig_tx[grepl("^transcript", rownames(sig_tx)), ]
@@ -460,7 +462,6 @@ sig_novel_tx <- sig_tx[grepl("^transcript", rownames(sig_tx)), ]
 # plot raw pvalues histogram
 
 hist(edger_Tx_res$table$PValue)
-
 ```
 
 # diffsplice- DTU
@@ -468,69 +469,70 @@ hist(edger_Tx_res$table$PValue)
 ## Preparing the matrix for the analysis
 
 ```{r}
-
-LR_Tx_counts_filtered<- as.data.frame(LR_Tx_counts_filtered)
-LR_Tx_counts_filtered$feature_id<- rownames(LR_Tx_counts_filtered)
+LR_Tx_counts_filtered <- as.data.frame(LR_Tx_counts_filtered)
+LR_Tx_counts_filtered$feature_id <- rownames(LR_Tx_counts_filtered)
 
 # extracting and merging gene_id to LR_counts
 
-mart <- useEnsembl(biomart = "ensembl", 
-                   dataset = "hsapiens_gene_ensembl") 
+mart <- useEnsembl(
+  biomart = "ensembl",
+  dataset = "hsapiens_gene_ensembl"
+)
 
 
-transcript_to_gene <- getBM(attributes = c("ensembl_transcript_id","external_gene_name"),
-                            filters = "ensembl_transcript_id",
-                            values = LR_Tx_counts_filtered$feature_id,
-                            mart = mart)
+transcript_to_gene <- getBM(
+  attributes = c("ensembl_transcript_id", "external_gene_name"),
+  filters = "ensembl_transcript_id",
+  values = LR_Tx_counts_filtered$feature_id,
+  mart = mart
+)
 
 
-LR_Tx_counts_filtered <- merge(LR_Tx_counts_filtered, transcript_to_gene, 
-                             by.x = "feature_id", 
-                             by.y = "ensembl_transcript_id", 
-                             all.x = TRUE)
+LR_Tx_counts_filtered <- merge(LR_Tx_counts_filtered, transcript_to_gene,
+                               by.x = "feature_id",
+                               by.y = "ensembl_transcript_id",
+                               all.x = TRUE
+)
 
 # naming and reordering
 
-colnames(LR_Tx_counts_filtered)[8]<- "gene_id"
+colnames(LR_Tx_counts_filtered)[8] <- "gene_id"
 
-LR_Tx_counts_filtered<- LR_Tx_counts_filtered[, c(1,8,2,3,4,5,6,7)]
+LR_Tx_counts_filtered <- LR_Tx_counts_filtered[, c(1, 8, 2, 3, 4, 5, 6, 7)]
 
 LR_Tx_counts_filtered <- na.omit(LR_Tx_counts_filtered)
-
 ```
 
 ## running diffsplice
 ```{r}
-
-mat<- as.matrix(LR_Tx_counts_filtered[, - c(1,2)])
+mat <- as.matrix(LR_Tx_counts_filtered[, -c(1, 2)])
 rownames(mat) <- LR_Tx_counts_filtered$feature_id
 
-gene_df <- LR_Tx_counts_filtered[, c(1,2)]
+gene_df <- LR_Tx_counts_filtered[, c(1, 2)]
 
 
 y <- DGEList(counts = mat, samples = LR_samples, genes = gene_df)
 
- keep <- filterByExpr(y, group = LR_metadata$Dose)
- y <- y[keep, , keep.lib.sizes=FALSE]
+keep <- filterByExpr(y, group = LR_metadata$Dose)
+y <- y[keep, , keep.lib.sizes = FALSE]
 
 y <- normLibSizes(y)
 y$samples
 
 design <- model.matrix(~ Donors + group, data = y$samples)
 
-fit<- glmQLFit(y, design)
+fit <- glmQLFit(y, design)
 
-ex <- diffSplice( fit = fit,
-                  coef= 4,
-                  geneid = "gene_id",
-                  exonid = "feature_id",
-                  robust = TRUE
-                  )
+ex <- diffSplice(
+  fit = fit,
+  coef = 4,
+  geneid = "gene_id",
+  exonid = "feature_id",
+  robust = TRUE
+)
 
-ts <- topSplice(ex,  number=Inf)
+ts <- topSplice(ex, number = Inf)
 ts.tx <- topSplice(ex, test = "t", number = Inf)
-
-
 ```
 
 ## StageR
@@ -543,61 +545,68 @@ rownames(pConfirmation) <- ts.tx$feature_id
 
 tx2gene <- ts.tx[, c(1, 2)]
 
-stageRObj2 <- stageRTx(pScreen = pScreen, 
-                       pConfirmation = pConfirmation,
-                        pScreenAdjusted = FALSE, 
-                       tx2gene = tx2gene)
+stageRObj2 <- stageRTx(
+  pScreen = pScreen,
+  pConfirmation = pConfirmation,
+  pScreenAdjusted = FALSE,
+  tx2gene = tx2gene
+)
 
-stageRObj2 <- stageWiseAdjustment(object = stageRObj2, 
-                                  method = "dtu",
-                                  alpha = 0.05)
+stageRObj2 <- stageWiseAdjustment(
+  object = stageRObj2,
+  method = "dtu",
+  alpha = 0.05
+)
 suppressWarnings({
-  ds.padj <- getAdjustedPValues(stageRObj2, order=TRUE,
-                                  onlySignificantGenes=TRUE)
+  ds.padj <- getAdjustedPValues(stageRObj2,
+                                order = TRUE,
+                                onlySignificantGenes = TRUE
+  )
 })
 head(ds.padj)
 
-ds.filtered<- ds.padj[ds.padj$transcript<=0.05,]
+ds.filtered <- ds.padj[ds.padj$transcript <= 0.05, ]
 
 
-plotSplice(ex, geneid = "RPS19", genecolname="gene_id", FDR = 0.05)
-
-
-
+plotSplice(ex, geneid = "RPS19", genecolname = "gene_id", FDR = 0.05)
 ```
 
 # Enrichment --> Kegg, GO, reactome
 
 ```{r}
-
-
 deg_genes <- rownames(sig_genes_edger)
 
 # Convert gene symbols to Entrez IDs
-entrez_genes <- bitr(deg_genes, fromType = "ENSEMBL",
+entrez_genes <- bitr(deg_genes,
+                     fromType = "ENSEMBL",
                      toType = "ENTREZID",
-                     OrgDb = org.Hs.eg.db)
+                     OrgDb = org.Hs.eg.db
+)
 
 # Perform KEGG pathway enrichment
-kegg_res <- enrichKEGG(gene = entrez_genes$ENTREZID,
-                       organism = "hsa",          # "hsa" for human
-                       pvalueCutoff = 0.05)
+kegg_res <- enrichKEGG(
+  gene = entrez_genes$ENTREZID,
+  organism = "hsa", # "hsa" for human
+  pvalueCutoff = 0.05
+)
 
-kegg_res<- kegg_res@result[kegg_res@result$p.adjust <= 0.05,]
+kegg_res <- kegg_res@result[kegg_res@result$p.adjust <= 0.05, ]
 
 
 # reactome pathway analysis
 
-reactome_res <- enrichPathway(gene = entrez_genes$ENTREZID,
-                              organism = "human",
-                              pvalueCutoff = 0.05,
-                              readable = TRUE)
+reactome_res <- enrichPathway(
+  gene = entrez_genes$ENTREZID,
+  organism = "human",
+  pvalueCutoff = 0.05,
+  readable = TRUE
+)
 
-reactome_res<- reactome_res@result[reactome_res@result$p.adjust <= 0.05,]
+reactome_res <- reactome_res@result[reactome_res@result$p.adjust <= 0.05, ]
 
 # GO enrichment
 
-deg_genes_symbol<- mapIds(
+deg_genes_symbol <- mapIds(
   org.Hs.eg.db,
   keys = deg_genes,
   column = "SYMBOL",
@@ -605,40 +614,39 @@ deg_genes_symbol<- mapIds(
   multiVals = "first"
 )
 
-clusterprofiler_res<- enrichGO(deg_genes_symbol,
-                               keyType = "SYMBOL",
-                               ont="BP",
-                               OrgDb =  "org.Hs.eg.db",
-                               pvalueCutoff=0.05,
-                               pAdjustMethod="BH",
-                               qvalueCutoff = 0.2,
-                               minGSSize = 10,
-                               maxGSSize = 500)
+clusterprofiler_res <- enrichGO(deg_genes_symbol,
+                                keyType = "SYMBOL",
+                                ont = "BP",
+                                OrgDb = "org.Hs.eg.db",
+                                pvalueCutoff = 0.05,
+                                pAdjustMethod = "BH",
+                                qvalueCutoff = 0.2,
+                                minGSSize = 10,
+                                maxGSSize = 500
+)
 
 
-clusterprofiler_res_sig <- clusterprofiler_res@result[clusterprofiler_res@result$p.adjust<=0.05, ]
+clusterprofiler_res_sig <- clusterprofiler_res@result[clusterprofiler_res@result$p.adjust <= 0.05, ]
 
 View(clusterprofiler_res_sig)
-
 ```
 
 ## GeneTonic
 
 ```{r}
-
 # create DESeq result object
 
-de_res_table<- edger_gene_res$table
+de_res_table <- edger_gene_res$table
 
 deseq_like <- DataFrame(
   log2FoldChange = de_res_table$logFC,
-  stat = de_res_table$F,                
+  stat = de_res_table$F,
   pvalue = de_res_table$PValue,
   padj = de_res_table$FDR,
   row.names = rownames(de_res_table)
 )
 
-deseq_like<- DESeqResults(deseq_like)
+deseq_like <- DESeqResults(deseq_like)
 
 # create GeneTonic object
 
@@ -649,7 +657,7 @@ gtl_4Gy <- GeneTonicList(
   annotation_obj = anno_df
 )
 
-#GeneTonic(gtl= gtl_4Gy)
+# GeneTonic(gtl= gtl_4Gy)
 
 
 # preparing the matrix for heatmap
@@ -663,7 +671,7 @@ scored_mat <- GeneTonic::gs_scores(se = vsd_LR_corrected, gtl = gtl_4Gy)
 anno <- as.data.frame(colData(vsd_LR_corrected)[, c("Sex", "Donors", "Dose")])
 
 dose_colors <- colorRampPalette(c("lightyellow", "red"))(2)
-names(dose_colors)<- c("0Gy", "4Gy")
+names(dose_colors) <- c("0Gy", "4Gy")
 
 anno_colors <- list(
   Sex = c(female = "pink", male = "blue"),
@@ -680,55 +688,55 @@ column_annotation <- HeatmapAnnotation(
 library(circlize)
 
 col_fun <- colorRamp2(
-  c(-2, 0, 2), 
+  c(-2, 0, 2),
   c("blue", "white", "red")
 )
 
-ht<-Heatmap(scored_mat[1:15,],
-  name = "Expression",
-  top_annotation = column_annotation,
-  cluster_columns = F, # Optional: Cluster columns
-  cluster_rows = F, # Optional: Cluster rows
-  show_row_names = T,
-  show_column_names = TRUE, 
-  row_dend_side = "left",
-  row_names_side = "left",
-  row_names_gp = gpar(fontsize = 10, fontface= "bold" ),
-  width = unit(7, "cm"),
-  heatmap_height = unit(12, "cm"),
-  column_names_gp = gpar(fontsize = 7), 
-  column_labels = rep(c(1,2,3),2),
-  column_names_rot = 360,
-  column_title = "Donors", 
-  column_title_side = "bottom",
-  show_heatmap_legend = T, 
-  col = col_fun
+ht <- Heatmap(scored_mat[1:15, ],
+              name = "Expression",
+              top_annotation = column_annotation,
+              cluster_columns = F, # Optional: Cluster columns
+              cluster_rows = F, # Optional: Cluster rows
+              show_row_names = T,
+              show_column_names = TRUE,
+              row_dend_side = "left",
+              row_names_side = "left",
+              row_names_gp = gpar(fontsize = 10, fontface = "bold"),
+              width = unit(7, "cm"),
+              heatmap_height = unit(12, "cm"),
+              column_names_gp = gpar(fontsize = 7),
+              column_labels = rep(c(1, 2, 3), 2),
+              column_names_rot = 360,
+              column_title = "Donors",
+              column_title_side = "bottom",
+              show_heatmap_legend = T,
+              col = col_fun
 )
 
 
-draw(ht,  heatmap_legend_side = "right" , annotation_legend_side = "right" )
-
+draw(ht, heatmap_legend_side = "right", annotation_legend_side = "right")
 ```
 
 ## enrichment for the downregulated genes
 
 ```{r}
-dwn_sig<- sig_genes_edger[sig_genes_edger$logFC<0,]
+dwn_sig <- sig_genes_edger[sig_genes_edger$logFC < 0, ]
 
-dwn_genes<- dwn_sig$SYMBOL
+dwn_genes <- dwn_sig$SYMBOL
 
-clusterprofiler_res_dwn<- enrichGO(dwn_genes,
-                               keyType = "SYMBOL",
-                               ont="BP",
-                               OrgDb =  "org.Hs.eg.db",
-                               pvalueCutoff=0.05,
-                               pAdjustMethod="BH",
-                               qvalueCutoff = 0.2,
-                               minGSSize = 10,
-                               maxGSSize = 500)
+clusterprofiler_res_dwn <- enrichGO(dwn_genes,
+                                    keyType = "SYMBOL",
+                                    ont = "BP",
+                                    OrgDb = "org.Hs.eg.db",
+                                    pvalueCutoff = 0.05,
+                                    pAdjustMethod = "BH",
+                                    qvalueCutoff = 0.2,
+                                    minGSSize = 10,
+                                    maxGSSize = 500
+)
 
 
-clusterprofiler_res_dwn<- clusterprofiler_res_dwn@result[clusterprofiler_res_dwn@result$p.adjust<=0.05, ]
+clusterprofiler_res_dwn <- clusterprofiler_res_dwn@result[clusterprofiler_res_dwn@result$p.adjust <= 0.05, ]
 
 View(clusterprofiler_res_dwn)
 ```
@@ -736,13 +744,12 @@ View(clusterprofiler_res_dwn)
 # Gene Set Variation Analysis-GSVA
 
 ```{r}
-
 exprs_mat <- assay(dds_LR)
 
 exprs_mat <- exprs_mat[!grepl("^transcript", rownames(exprs_mat)), ]
 
 
-exprs_mat <- exprs_mat[rowSums(exprs_mat) > 6,]
+exprs_mat <- exprs_mat[rowSums(exprs_mat) > 6, ]
 
 
 genes_exprs_mat <- rownames(exprs_mat)
@@ -755,12 +762,12 @@ genes_exprs_mat <- mapIds(
   multiVals = "first"
 )
 
-exprs_df<- as.data.frame(exprs_mat)
-exprs_df$SYMBOL<- genes_exprs_mat
+exprs_df <- as.data.frame(exprs_mat)
+exprs_df$SYMBOL <- genes_exprs_mat
 
 # calculating the variance
 
-exprs_df$variance <- apply(exprs_df[ , !(names(exprs_df) %in% c("SYMBOL"))], 1, var, na.rm = TRUE)
+exprs_df$variance <- apply(exprs_df[, !(names(exprs_df) %in% c("SYMBOL"))], 1, var, na.rm = TRUE)
 
 # 2. Keep the most variable transcript per gene symbol
 exprs_highvar <- exprs_df %>%
@@ -774,11 +781,11 @@ exprs_highvar <- exprs_highvar %>% dplyr::select(-variance)
 # 4. Set SYMBOL as rownames
 exprs_highvar <- as.data.frame(exprs_highvar)
 
-exprs_highvar<- na.omit(exprs_highvar)
+exprs_highvar <- na.omit(exprs_highvar)
 rownames(exprs_highvar) <- exprs_highvar$SYMBOL
 exprs_highvar$SYMBOL <- NULL
 
-exprs_highvar<- as.matrix(exprs_highvar)
+exprs_highvar <- as.matrix(exprs_highvar)
 
 # run GSVA
 
@@ -797,10 +804,10 @@ go_ids <- rownames(esmicro)
 # Get the term names
 go_terms <- Term(GOTERM[go_ids])
 # Add as a new column
-esmicro<- as.data.frame(esmicro)
+esmicro <- as.data.frame(esmicro)
 esmicro$Description <- go_terms
-rownames(esmicro)<- esmicro$Description
-esmicro<- esmicro[, -7]
+rownames(esmicro) <- esmicro$Description
+esmicro <- esmicro[, -7]
 
 
 # Applying Limma on GSVA matrix to extract differentially expressed pathways
@@ -825,7 +832,7 @@ corfit <- duplicateCorrelation(esmicro, design, block = patient)
 
 fit <- lmFit(esmicro, design, block = patient, correlation = corfit$consensus)
 
-contrast.matrix <- makeContrasts((f4Gy-f0Gy), levels = design)
+contrast.matrix <- makeContrasts((f4Gy - f0Gy), levels = design)
 
 fit2 <- contrasts.fit(fit, contrast.matrix)
 
@@ -838,21 +845,18 @@ results_f_gsva <- decideTests(fit2, p.value = 0.05)
 summary(results_f_gsva)
 
 
-results_f_gsva<- as.data.frame(results_f_gsva)
+results_f_gsva <- as.data.frame(results_f_gsva)
 
 
 sig_gsva <- results_f_gsva[results_f_gsva[, 1] == 1, ]
-
 ```
 
 ## GSEA using GO terms
 
 ```{r}
-
-
 ## background genes
 
-background_genes <- edger_gene_res$table%>%
+background_genes <- edger_gene_res$table %>%
   as.data.frame() %>%
   filter(logCPM != 0) %>%
   tibble::rownames_to_column(var = "gene") %>%
@@ -897,13 +901,13 @@ res_df <- res_df %>%
 res_df_filtered <- res_df %>%
   dplyr::group_by(SYMBOL) %>%
   dplyr::arrange(FDR, .by_group = TRUE) %>%
-  dplyr::slice(        # keep logic per group
+  dplyr::slice( # keep logic per group
     if (any(FDR <= 0.05)) which.min(FDR) else 1
   ) %>%
   dplyr::ungroup()
 
 
-res_df_filtered<- na.omit(res_df_filtered)
+res_df_filtered <- na.omit(res_df_filtered)
 
 gene_list <- res_df_filtered$signed_rank_stats
 names(gene_list) <- res_df_filtered$SYMBOL
@@ -919,19 +923,18 @@ write.csv(em2@result, "GSEA_results.csv")
 ### visualization
 
 p1 <- gseaplot(em2,
-  geneSetID = "GOBP_PEPTIDE_ANTIGEN_ASSEMBLY_WITH_MHC_CLASS_II_PROTEIN_COMPLEX",
-  by = "runningScore", title = "GOBP_PEPTIDE_ANTIGEN_ASSEMBLY_WITH_MHC_CLASS_II_PROTEIN_COMPLEX"
+               geneSetID = "GOBP_PEPTIDE_ANTIGEN_ASSEMBLY_WITH_MHC_CLASS_II_PROTEIN_COMPLEX",
+               by = "runningScore", title = "GOBP_PEPTIDE_ANTIGEN_ASSEMBLY_WITH_MHC_CLASS_II_PROTEIN_COMPLEX"
 )
 
 p2 <- gseaplot(em2,
-  geneSetID = "GOBP_HUMORAL_IMMUNE_RESPONSE",
-  by = "runningScore", title = "GOBP_HUMORAL_IMMUNE_RESPONSE"
+               geneSetID = "GOBP_HUMORAL_IMMUNE_RESPONSE",
+               by = "runningScore", title = "GOBP_HUMORAL_IMMUNE_RESPONSE"
 )
 
 p1 / p2
 
-#ggsave("GSEA.png", plot = p1 / p2, width = 7, height = 6, dpi = 400)
-
+# ggsave("GSEA.png", plot = p1 / p2, width = 7, height = 6, dpi = 400)
 ```
 
 
@@ -939,15 +942,14 @@ p1 / p2
 # Transdecoder
 
 ```{r}
-
 # Read protein FASTA file
 pep <- readAAStringSet("novel_isoforms_n.fa.transdecoder.pep")
 
 # Inspect
 pep
-names(pep)[1:5]     # transcript IDs
-width(pep)[1:5]     # sequence lengths
-pep[1]              # first sequence
+names(pep)[1:5] # transcript IDs
+width(pep)[1:5] # sequence lengths
+pep[1] # first sequence
 
 # convert to df
 headers <- names(pep)
@@ -982,27 +984,22 @@ pep_df_strict <- pep_df %>%
 pep_df$clean_id <- sub("^([^.]+\\.[^.]+\\.[^.]+).*", "\\1", pep_df[[1]])
 
 pep_df_strict$clean_id <- sub("^([^.]+\\.[^.]+\\.[^.]+).*", "\\1", pep_df_strict[[1]])
-
-
-
-
 ```
 
 # CPC2
 
 ```{r}
-
-novel_isoforms_fa<- readAAStringSet("novel_isoforms_n.fa")
-
+novel_isoforms_fa <- readAAStringSet("novel_isoforms_n.fa")
 
 
-novel_isoforms_fa_df<- as.data.frame(novel_isoforms_fa)
+
+novel_isoforms_fa_df <- as.data.frame(novel_isoforms_fa)
 
 # focusing on the 8 transcripts detected by transdecoder
 
-selected_8_tx<- c("transcript13458.chr22.nnic", "transcript13760.chr9.nnic", "transcript13826.chr15", "transcript15213.chr10.nnic", "transcript21609.chr6.nnic", "transcript21664.chr9.nnic", "transcript23187.chr5.nnic", "transcript36523.chr12.nnic")
+selected_8_tx <- c("transcript13458.chr22.nnic", "transcript13760.chr9.nnic", "transcript13826.chr15", "transcript15213.chr10.nnic", "transcript21609.chr6.nnic", "transcript21664.chr9.nnic", "transcript23187.chr5.nnic", "transcript36523.chr12.nnic")
 
-selected_tx_fa<- novel_isoforms_fa_df[selected_8_tx,]
+selected_tx_fa <- novel_isoforms_fa_df[selected_8_tx, ]
 
 
 ids <- paste0("seq", seq_along(selected_tx_fa))
@@ -1015,37 +1012,35 @@ writeLines(
 
 
 
-cpc_res<- read.table("cpc_res.txt")
-colnames(cpc_res)<- c("ID",	"peptide_length","Fickett_score",	"pI",	"ORF_integrity",	"coding_probability",	"label")
+cpc_res <- read.table("cpc_res.txt")
+colnames(cpc_res) <- c("ID", "peptide_length", "Fickett_score", "pI", "ORF_integrity", "coding_probability", "label")
 
-cpc_res_coding <- cpc_res[cpc_res$label =="coding",]
-cpc_res_noncoding <- cpc_res[cpc_res$label =="noncoding",]
-
-
+cpc_res_coding <- cpc_res[cpc_res$label == "coding", ]
+cpc_res_noncoding <- cpc_res[cpc_res$label == "noncoding", ]
 ```
 
 # Gffcompare
 
 ```{r}
-
 tmap <- read.table("Isoquant/OUT/gffcmp_out.OUT.transcript_models.gtf.tmap",
-        sep = "\t", header = FALSE, quote = "", stringsAsFactors = FALSE, fill = TRUE)
+                   sep = "\t", header = FALSE, quote = "", stringsAsFactors = FALSE, fill = TRUE
+)
 
 # 3. Filter the tmap file to keep only those novel transcripts
 
-selected_8_tx<- c("transcript13458.chr22.nnic", "transcript13760.chr9.nnic", "transcript13826.chr15.nnic", "transcript15213.chr10.nnic", "transcript21609.chr6.nnic", "transcript21664.chr9.nnic", "transcript23187.chr5.nnic", "transcript36523.chr12.nnic")
+selected_8_tx <- c("transcript13458.chr22.nnic", "transcript13760.chr9.nnic", "transcript13826.chr15.nnic", "transcript15213.chr10.nnic", "transcript21609.chr6.nnic", "transcript21664.chr9.nnic", "transcript23187.chr5.nnic", "transcript36523.chr12.nnic")
 
 
-tmap_novel <- tmap %>% 
+tmap_novel <- tmap %>%
   filter(V5 %in% selected_8_tx)
 
-tmap_novel_full <- tmap %>% 
+tmap_novel_full <- tmap %>%
   filter(V5 %in% rownames(sig_novel_tx))
 
-colnames(tmap_novel)<- tmap[1,]
-colnames(tmap_novel_full)<- tmap[1,]
+colnames(tmap_novel) <- tmap[1, ]
+colnames(tmap_novel_full) <- tmap[1, ]
 
-tmap_novel_full[,1]<- gsub("\\..*", "", tmap_novel_full[,1])
+tmap_novel_full[, 1] <- gsub("\\..*", "", tmap_novel_full[, 1])
 
 tmap_novel_full$SYMBOL <- mapIds(
   org.Hs.eg.db,
@@ -1054,20 +1049,16 @@ tmap_novel_full$SYMBOL <- mapIds(
   keytype = "ENSEMBL",
   multiVals = "first"
 )
-
 ```
 
 # CPAT
 
 ```{r}
+cpat_res <- read_tsv("cpat_results.txt.ORF_prob.best.tsv")
 
-cpat_res <- read_tsv("cpat_results.txt.ORF_prob.best.tsv") 
-
-cpat_res_coding<- cpat_res[ cpat_res$Coding_prob>=0.5,]
+cpat_res_coding <- cpat_res[cpat_res$Coding_prob >= 0.5, ]
 
 View(cpat_res_coding)
-
-
 ```
 
 ```{r}
@@ -1077,18 +1068,18 @@ venn.plot <- venn.diagram(
     CPC2 = cpc_res_coding$ID,
     CPAT = tolower(cpat_res_coding$seq_ID)
   ),
-  filename = NULL,  # Plot to R directly
+  filename = NULL, # Plot to R directly
   fill = c("#66c2a5", "#8da0cb", "orange"),
   alpha = 0.6,
   cat.cex = 1.2,
   cex = 1.5,
-#  main = "Novel coding isoforms"
+  #  main = "Novel coding isoforms"
 )
 
 grid::grid.draw(venn.plot)
 
 
-#the transcript that exist only on cpat (transcript37812.chr6.nnic), if at all, could be a coding one. it is labeled non coding in cpc 2 but its coding probability is 0.34. however, it doesnt exist at all in transdecoder output
+# the transcript that exist only on cpat (transcript37812.chr6.nnic), if at all, could be a coding one. it is labeled non coding in cpc 2 but its coding probability is 0.34. however, it doesnt exist at all in transdecoder output
 # the transcript that exist in transdecoder only (transcript25470.chr1.nic) doesnt exist at all in cpat output and it as very low coding prob in cpc2 0.00349659
 
 
@@ -1096,27 +1087,28 @@ grid::grid.draw(venn.plot)
 
 
 TransDecoder <- tolower(unique(pep_df$clean_id))
-CPC2         <- tolower(cpc_res_coding$ID)
-CPAT         <- tolower(cpat_res_coding$seq_ID)
+CPC2 <- tolower(cpc_res_coding$ID)
+CPAT <- tolower(cpat_res_coding$seq_ID)
 
 shared_transcripts <- Reduce(intersect, list(TransDecoder, CPC2, CPAT))
 length(shared_transcripts)
-
 ```
 
 
 ```{r}
-
-
 # For CPAT: classify based on coding probability threshold
 cpat_res_labeled <- cpat_res %>%
-  mutate(tool = "CPAT",
-         label = ifelse(Coding_prob >= 0.5, "Coding", "Non-coding"))
+  mutate(
+    tool = "CPAT",
+    label = ifelse(Coding_prob >= 0.5, "Coding", "Non-coding")
+  )
 
 # For CPC2: assume the column is named 'coding' or similar
 cpc_res_labeled <- cpc_res %>%
-  mutate(tool = "CPC2",
-         label = ifelse(tolower(label) == "coding", "Coding", "Non-coding"))
+  mutate(
+    tool = "CPC2",
+    label = ifelse(tolower(label) == "coding", "Coding", "Non-coding")
+  )
 
 # --- TransDecoder ---
 # You mentioned there are 14 total transcripts (11 unique) with ORFs
@@ -1124,7 +1116,7 @@ cpc_res_labeled <- cpc_res %>%
 transdecoder_unique <- unique(pep_df$clean_id)
 
 # Total number of isoforms in your dataset (e.g., 26 total)
-total_isoforms <- 26  # <-- change this to your real total number
+total_isoforms <- 26 # <-- change this to your real total number
 
 # Compute counts
 transdecoder_df <- tibble(
@@ -1151,7 +1143,6 @@ ggplot(summary_df, aes(x = tool, y = count, fill = label)) +
     fill = "Transcript Type"
   ) +
   theme_minimal(base_size = 14)
-
 ```
 
 # Session info
@@ -1159,4 +1150,3 @@ ggplot(summary_df, aes(x = tool, y = count, fill = label)) +
 ```{r}
 sessionInfo()
 ```
-
