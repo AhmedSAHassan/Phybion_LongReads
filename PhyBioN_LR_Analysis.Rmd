@@ -1,0 +1,1162 @@
+---
+title: "PhyBioN_LR_Analysis"
+date: "2025-11-27"
+output: 
+  BiocStyle::html_document:
+    number_sections: true
+    toc: true
+    toc_float: true
+---
+# Loading the libraries
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+library("DRIMSeq")
+library("biomaRt")
+library("ggplot2")
+library("readxl")
+library("readr")
+library("BiocParallel")
+library("tximport")
+library("DESeq2")
+library("edgeR")
+library("mosdef")
+library("limma")
+library("stageR")
+library("dplyr")
+library("VennDiagram")
+library("GenomicRanges")
+library("rtracklayer")
+library("ggrepel")
+library("ggplot2")
+library("ComplexHeatmap")
+library("pheatmap")
+library("GSVA")
+library("msigdbr")
+library("clusterProfiler")
+library("org.Hs.eg.db")
+library("enrichplot")
+library("ReactomePA")
+library("topGO")
+library("quantiseqr")
+library("circlize")
+library("GeneTonic")
+library("tibble")
+library("Biostrings")
+library("stringr")
+
+```
+
+# Loading the dataset
+
+## Loading the long read -gene level- data
+```{r}
+
+dds_LR <- readRDS("~/Phybion_Pilot_LR/dds_LR.RDS")
+
+# Variance stabilizing transformation
+
+vsd_LR <- vst(dds_LR)
+
+```
+
+## Loading LR - Transcript level- data
+
+```{r}
+
+colData <- read_excel("./coldata_phybion_pilot_LR.xlsx")
+
+colData <- as.data.frame(colData)
+
+
+LR_metadata<- colData
+
+
+LR_Tx_counts<- read.table(file ="./Isoquant/OUT/OUT.transcript_model_grouped_counts.tsv")
+
+# Transcript counts
+# Removing un-annotated transcripts since they cannot be used for diff splice analysis
+
+LR_Tx_counts_filtered <- LR_Tx_counts[!grepl("^transcript", LR_Tx_counts$V1), ]
+
+# Gencode to Ensemble id
+
+LR_Tx_counts_filtered[,1]<- gsub("\\..*", "", LR_Tx_counts_filtered[,1])
+
+# assigning the transcripts id to the rownames
+
+rownames(LR_Tx_counts_filtered)<- LR_Tx_counts_filtered[,1]
+LR_Tx_counts_filtered<- LR_Tx_counts_filtered[,-1]
+
+
+rownames(LR_Tx_counts)<- LR_Tx_counts[,1]
+LR_Tx_counts<- LR_Tx_counts[,-1]
+
+LR_Tx_counts<- LR_Tx_counts[rowSums(LR_Tx_counts) > 6,]
+# naming the columns
+
+colnames(LR_Tx_counts_filtered)<- c("0Gy-F", "0Gy-A", "0Gy-S", "4Gy-F", "4Gy-A", "4Gy-S")
+
+colnames(LR_Tx_counts)<- c("0Gy-F", "0Gy-A", "0Gy-S", "4Gy-F", "4Gy-A", "4Gy-S")
+
+```
+
+# Data exploration
+
+## PCA plot
+
+```{r}
+
+pca_plot_LR <- plotPCA(vsd_LR, 
+                       intgroup = c("Donors", "Dose"),
+                       returnData = TRUE)
+
+percentVar <- round(100 * attr(pca_plot_LR, "percentVar"))
+
+
+
+ggpt <- theme_bw() +
+    theme(
+       axis.title.x=element_text(size=rel(1.6)),
+        axis.title.y=element_text(size=rel(1.6)),
+        axis.text.x=element_text(size=rel(1.6)),
+        axis.text.y=element_text(size=rel(1.6)),
+        strip.text.x=element_text(size=rel(1.6)),
+        strip.text.y=element_text(size=rel(1.6)),
+        legend.text=element_text(size=rel(1.4)),
+        legend.title=element_text(size=rel(1.4)),
+        plot.title=element_text(size=rel(1.6)))
+
+
+PCA_LR<- ggplot(pca_plot_LR, 
+                aes(x = PC1, y = PC2, color = Donors)) +
+  geom_point(size = 3) +
+  scale_shape_manual(values = c(16, 17)) + 
+  xlab(paste0("PC1: ", percentVar[1], "% variance")) +
+  ylab(paste0("PC2: ", percentVar[2], "% variance")) +
+  theme_minimal() + theme(
+    plot.title = element_text(size = 17), 
+    axis.title.x = element_text(size = 15), 
+    axis.title.y = element_text(size = 15), 
+    axis.text = element_text(size = 13),   
+    legend.text = element_text(size = 13), 
+    legend.title = element_text(size = 15) 
+  )
+
+PCA_LR+ggpt
+
+# There is a strong interdonor variation which has to be accounted for in the design before DEA
+
+```
+
+# EdgeR_DEA
+
+## gene level DEA
+
+```{r}
+gene_mat <- counts(dds_LR)
+
+LR_samples <- data.frame(sample_id = LR_metadata$sample_id,
+                         group = LR_metadata$Dose,
+                         Donors = LR_metadata$Donors)
+
+knitr::kable(LR_samples)
+
+# Create DGEList
+y_DEA <- DGEList(counts = gene_mat, 
+                 samples = LR_samples)
+
+keep <- filterByExpr(y_DEA)
+y_DEA <- y_DEA[keep, keep.lib.sizes=FALSE]
+
+# TMM normalization
+y_DEA <- normLibSizes(y_DEA)
+
+# Define factors
+Donor <- factor(LR_metadata$Donors)
+Treatment <- factor(LR_metadata$Dose) 
+
+# Design matrix including donor
+design <- model.matrix(~ Donor + Treatment)
+
+#  Estimate dispersions
+
+y_DEA <- estimateDisp(y_DEA, design)
+
+y_DEA$common.dispersion
+
+# dispersion estimate plot
+
+plotBCV(y_DEA)
+
+#  Fit GLM model
+fit_gene <- glmQLFit(y_DEA, design)
+
+# plot quasi-likelihood despersion
+
+plotQLDisp(fit_gene)
+
+# Test for a treatment effect
+lrt_gene <- glmQLFTest(fit_gene, coef = "Treatment4Gy")
+
+# Extract results
+edger_gene_res <- topTags(lrt_gene, n = Inf)
+
+
+sig_genes_edger <- edger_gene_res$table[edger_gene_res$table$FDR<=0.05,]
+
+# plot raw pvalues histogram
+
+hist(edger_gene_res$table$PValue)
+
+
+sig_genes_edger$SYMBOL <- mapIds(
+  org.Hs.eg.db,
+  keys = rownames(sig_genes_edger),
+  column = "SYMBOL",
+  keytype = "ENSEMBL",
+  multiVals = "first"
+)
+
+```
+
+## Volcanoplot
+
+```{r}
+
+de_res<- edger_gene_res$table
+
+top_genes <- de_res[order(de_res$FDR), ][1:10, ]
+top_genes$SYMBOL <- mapIds(
+  org.Hs.eg.db,
+  keys = rownames(top_genes),
+  column = "SYMBOL",
+  keytype = "ENSEMBL",
+  multiVals = "first"
+)
+
+
+# Define up/down/NS
+de_res$diffexpressed <- factor(ifelse(de_res$FDR < 0.05 & de_res$logFC > 0, "Up",
+                                      ifelse(de_res$FDR < 0.05 & de_res$logFC < 0, "Down", "NS")))
+
+# Volcano plot
+g <- ggplot(de_res, aes(x = logFC, y = -log10(FDR), color = diffexpressed)) +
+  geom_point(alpha = 0.4, size = 3) +
+  geom_text_repel(
+    data = top_genes,
+    aes(x = logFC, y = -log10(FDR), label = SYMBOL),
+    size = 4,
+    color = "black"
+  ) +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "grey") +
+  xlim(c(-14,14)) +
+  xlab("log2 fold change") +
+  ylab("-log10 FDR") +
+  scale_color_manual(values = c("blue", "grey", "red")) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  ggpt
+
+g
+
+
+```
+## Creating gene plotting function
+
+```{r}
+
+plot_gene_modified <- function(dds, gene, intgroup = "condition", assay = "counts", 
+                               annotation_obj = NULL, normalized = TRUE, transform = TRUE, 
+                               labels_display = FALSE, labels_repel = TRUE, plot_type = "auto", 
+                               return_data = FALSE, color_by = "Donors") {
+  
+  plot_type <- match.arg(plot_type, c("auto", "jitteronly", "boxplot", "violin", "sina"))
+  
+  if (!(all(intgroup %in% colnames(colData(dds))))) {
+    stop("`intgroup` not found in the colData slot of the dds object.")
+  }
+  
+  df <- get_expr_values(de_container  = dds, gene = gene, intgroup = intgroup, 
+                              assay = assay, normalized = normalized)
+  df$sample_id <- rownames(df)
+  
+  # Add Donors column if it exists
+  if ("Donors" %in% colnames(colData(dds))) {
+    df$Donors <- colData(dds)[, "Donors"]
+  } else {
+    stop("The `Donors` column is missing in the colData of the dds object.")
+  }
+  
+  # Add gene annotation if provided
+  if (!is.null(annotation_obj)) {
+    genesymbol <- annotation_obj$gene_name[match(gene, annotation_obj$gene_id)]
+  } else {
+    genesymbol <- gene
+  }
+  
+  onlyfactors <- df[, match(intgroup, colnames(df))]
+  df$plotby <- interaction(onlyfactors)
+  min_by_groups <- min(table(df$plotby))
+  
+  if (return_data) {
+    return(df)
+  }
+  
+  p <- ggplot(df, aes(x = .data$plotby, y = .data$exp_value, col = .data[[color_by]])) + 
+    scale_x_discrete(name = "") + 
+    scale_color_discrete(name = "Experimental\ngroup") + 
+    theme_bw()
+  
+  jit_pos <- position_jitter(width = 0.2, height = 0, seed = 42)
+  
+  # Plot individual points
+  p <- p + geom_point(position = jit_pos, shape = 16, size = 3)
+  
+  # Display labels if required
+  if (labels_display) {
+    if (labels_repel) {
+      p <- p + ggrepel::geom_text_repel(aes(label = .data$sample_id), 
+                                        min.segment.length = 0, position = jit_pos)
+    } else {
+      p <- p + geom_text(aes(label = .data$sample_id), hjust = -0.1, vjust = 0.1, position = jit_pos)
+    }
+  }
+  
+  # Add a connected mean line across all groups
+#  p <- p + stat_summary(fun = mean, geom = "line", aes(group = 1), 
+ #                       color = "grey80", linewidth = 0.8)
+  
+  y_label <- if (assay == "counts" & normalized) {
+    "Normalized counts"
+  } else if (assay == "counts" & !normalized) {
+    "Counts"
+  } else if (assay == "abundance") {
+    "TPM - Transcripts Per Million"
+  } else {
+    assay
+  }
+  
+  if (transform) {
+    p <- p + scale_y_log10(name = paste0(y_label, " (log10 scale)"))
+  } else {
+    p <- p + scale_y_continuous(name = y_label)
+  }
+  
+  p <- p + labs(title = paste0(genesymbol, " - ", gene))
+  
+  return(p)
+}
+
+```
+
+
+## Checking the gene pattern across doses
+
+```{r}
+
+anno_df <- get_annotation_orgdb(
+  de_container = dds_LR,
+  orgdb_package = "org.Hs.eg.db",
+  id_type = "ENSEMBL")
+
+
+gene_plot<- plot_gene_modified(
+  dds= dds_LR,
+  gene = c("ENSG00000124762"),
+  intgroup = "Dose",
+  annotation_obj = anno_df)+ ggpt 
+
+gene_plot
+
+#ggsave("cd83.png", plot = gene_plot, width = 8, height = 5, dpi = 400)
+
+
+```
+
+# plotting tx
+
+```{r}
+LR_Tx_counts_full<- read.table(file = "./Isoquant/OUT/OUT.transcript_model_grouped_counts.tsv")
+
+tx_mat <- LR_Tx_counts_full
+rownames(tx_mat) <- tx_mat$V1
+tx_mat <- tx_mat[, -1]
+
+colnames(tx_mat)<- c("0Gy-F", "0Gy-A", "0Gy-S", "4Gy-F", "4Gy-A", "4Gy-S")
+
+
+dds_tx <- DESeqDataSetFromMatrix(countData = tx_mat ,
+                                 colData = LR_metadata,
+                                 design = ~ Dose + Donors)
+
+#ENST00000440815 ENST00000325568
+
+plot_gene_modified(
+  dds= dds_tx,
+  gene = c("ENST00000325568.9"),
+  intgroup = "Dose",
+  annotation_obj = anno_df) +
+  labs(
+    title = "IL-32 - ENST00000325568")+ggpt
+```
+
+## transcript level DEA
+
+```{r}
+
+tx_mat <- LR_Tx_counts
+
+y_DEA_tx <- DGEList(counts = tx_mat, 
+                    samples = LR_samples)
+
+keep <- filterByExpr(y_DEA_tx)
+y_DEA_tx <- y_DEA_tx[keep,,keep.lib.sizes=FALSE]
+
+# TMM normalization
+y_DEA_tx <- normLibSizes(y_DEA_tx)
+
+# Define factors
+Donor <- factor(LR_metadata$Donors)
+Treatment <- factor(LR_metadata$Dose)  
+
+# Design matrix including donor
+design <- model.matrix(~ Donor + Treatment)
+
+#  Estimate dispersions
+y_DEA_tx <- estimateDisp(y_DEA_tx, design)
+
+y_DEA_tx$common.dispersion
+
+# dispersion estimate plot
+
+plotBCV(y_DEA_tx)
+
+# Fit GLM model
+fit_tx <- glmQLFit(y_DEA_tx, design)
+
+# plot quasi-likelihood despersion
+
+plotQLDisp(fit_tx)
+
+# Test for a treatment effect
+
+lrt_tx <- glmQLFTest(fit_tx, coef = "Treatment4Gy")
+
+# Extract results
+edger_Tx_res <- topTags(lrt_tx, n = Inf)
+
+
+sig_tx<- edger_Tx_res$table[edger_Tx_res$table$FDR <= 0.05,]
+
+# Filter rows starting with "transcript"
+sig_novel_tx <- sig_tx[grepl("^transcript", rownames(sig_tx)), ]
+
+# plot raw pvalues histogram
+
+hist(edger_Tx_res$table$PValue)
+
+```
+
+# diffsplice- DTU
+
+## Preparing the matrix for the analysis
+
+```{r}
+
+LR_Tx_counts_filtered<- as.data.frame(LR_Tx_counts_filtered)
+LR_Tx_counts_filtered$feature_id<- rownames(LR_Tx_counts_filtered)
+
+# extracting and merging gene_id to LR_counts
+
+mart <- useEnsembl(biomart = "ensembl", 
+                   dataset = "hsapiens_gene_ensembl") 
+
+
+transcript_to_gene <- getBM(attributes = c("ensembl_transcript_id","external_gene_name"),
+                            filters = "ensembl_transcript_id",
+                            values = LR_Tx_counts_filtered$feature_id,
+                            mart = mart)
+
+
+LR_Tx_counts_filtered <- merge(LR_Tx_counts_filtered, transcript_to_gene, 
+                             by.x = "feature_id", 
+                             by.y = "ensembl_transcript_id", 
+                             all.x = TRUE)
+
+# naming and reordering
+
+colnames(LR_Tx_counts_filtered)[8]<- "gene_id"
+
+LR_Tx_counts_filtered<- LR_Tx_counts_filtered[, c(1,8,2,3,4,5,6,7)]
+
+LR_Tx_counts_filtered <- na.omit(LR_Tx_counts_filtered)
+
+```
+
+## running diffsplice
+```{r}
+
+mat<- as.matrix(LR_Tx_counts_filtered[, - c(1,2)])
+rownames(mat) <- LR_Tx_counts_filtered$feature_id
+
+gene_df <- LR_Tx_counts_filtered[, c(1,2)]
+
+
+y <- DGEList(counts = mat, samples = LR_samples, genes = gene_df)
+
+ keep <- filterByExpr(y, group = LR_metadata$Dose)
+ y <- y[keep, , keep.lib.sizes=FALSE]
+
+y <- normLibSizes(y)
+y$samples
+
+design <- model.matrix(~ Donors + group, data = y$samples)
+
+fit<- glmQLFit(y, design)
+
+ex <- diffSplice( fit = fit,
+                  coef= 4,
+                  geneid = "gene_id",
+                  exonid = "feature_id",
+                  robust = TRUE
+                  )
+
+ts <- topSplice(ex,  number=Inf)
+ts.tx <- topSplice(ex, test = "t", number = Inf)
+
+
+```
+
+## StageR
+
+```{r}
+pScreen <- ts$P.Value
+names(pScreen) <- ts$gene_id
+pConfirmation <- matrix(ts.tx$P.Value, ncol = 1)
+rownames(pConfirmation) <- ts.tx$feature_id
+
+tx2gene <- ts.tx[, c(1, 2)]
+
+stageRObj2 <- stageRTx(pScreen = pScreen, 
+                       pConfirmation = pConfirmation,
+                        pScreenAdjusted = FALSE, 
+                       tx2gene = tx2gene)
+
+stageRObj2 <- stageWiseAdjustment(object = stageRObj2, 
+                                  method = "dtu",
+                                  alpha = 0.05)
+suppressWarnings({
+  ds.padj <- getAdjustedPValues(stageRObj2, order=TRUE,
+                                  onlySignificantGenes=TRUE)
+})
+head(ds.padj)
+
+ds.filtered<- ds.padj[ds.padj$transcript<=0.05,]
+
+
+plotSplice(ex, geneid = "RPS19", genecolname="gene_id", FDR = 0.05)
+
+
+
+```
+
+# Enrichment --> Kegg, GO, reactome
+
+```{r}
+
+
+deg_genes <- rownames(sig_genes_edger)
+
+# Convert gene symbols to Entrez IDs
+entrez_genes <- bitr(deg_genes, fromType = "ENSEMBL",
+                     toType = "ENTREZID",
+                     OrgDb = org.Hs.eg.db)
+
+# Perform KEGG pathway enrichment
+kegg_res <- enrichKEGG(gene = entrez_genes$ENTREZID,
+                       organism = "hsa",          # "hsa" for human
+                       pvalueCutoff = 0.05)
+
+kegg_res<- kegg_res@result[kegg_res@result$p.adjust <= 0.05,]
+
+
+# reactome pathway analysis
+
+reactome_res <- enrichPathway(gene = entrez_genes$ENTREZID,
+                              organism = "human",
+                              pvalueCutoff = 0.05,
+                              readable = TRUE)
+
+reactome_res<- reactome_res@result[reactome_res@result$p.adjust <= 0.05,]
+
+# GO enrichment
+
+deg_genes_symbol<- mapIds(
+  org.Hs.eg.db,
+  keys = deg_genes,
+  column = "SYMBOL",
+  keytype = "ENSEMBL",
+  multiVals = "first"
+)
+
+clusterprofiler_res<- enrichGO(deg_genes_symbol,
+                               keyType = "SYMBOL",
+                               ont="BP",
+                               OrgDb =  "org.Hs.eg.db",
+                               pvalueCutoff=0.05,
+                               pAdjustMethod="BH",
+                               qvalueCutoff = 0.2,
+                               minGSSize = 10,
+                               maxGSSize = 500)
+
+
+clusterprofiler_res_sig <- clusterprofiler_res@result[clusterprofiler_res@result$p.adjust<=0.05, ]
+
+View(clusterprofiler_res_sig)
+
+```
+
+## GeneTonic
+
+```{r}
+
+# create DESeq result object
+
+de_res_table<- edger_gene_res$table
+
+deseq_like <- DataFrame(
+  log2FoldChange = de_res_table$logFC,
+  stat = de_res_table$F,                
+  pvalue = de_res_table$PValue,
+  padj = de_res_table$FDR,
+  row.names = rownames(de_res_table)
+)
+
+deseq_like<- DESeqResults(deseq_like)
+
+# create GeneTonic object
+
+gtl_4Gy <- GeneTonicList(
+  dds = dds_LR,
+  res_de = deseq_like,
+  res_enrich = shake_enrichResult(clusterprofiler_res),
+  annotation_obj = anno_df
+)
+
+#GeneTonic(gtl= gtl_4Gy)
+
+
+# preparing the matrix for heatmap
+
+vsd_LR_corrected <- vsd_LR
+
+assay(vsd_LR_corrected) <- limma::removeBatchEffect(assay(vsd_LR_corrected), batch = vsd_LR_corrected$Donors)
+scored_mat <- GeneTonic::gs_scores(se = vsd_LR_corrected, gtl = gtl_4Gy)
+
+
+anno <- as.data.frame(colData(vsd_LR_corrected)[, c("Sex", "Donors", "Dose")])
+
+dose_colors <- colorRampPalette(c("lightyellow", "red"))(2)
+names(dose_colors)<- c("0Gy", "4Gy")
+
+anno_colors <- list(
+  Sex = c(female = "pink", male = "blue"),
+  Dose = dose_colors
+)
+
+
+column_annotation <- HeatmapAnnotation(
+  Sex = anno$Sex,
+  Dose = anno$Dose,
+  col = anno_colors, show_legend = T
+)
+
+library(circlize)
+
+col_fun <- colorRamp2(
+  c(-2, 0, 2), 
+  c("blue", "white", "red")
+)
+
+ht<-Heatmap(scored_mat[1:15,],
+  name = "Expression",
+  top_annotation = column_annotation,
+  cluster_columns = F, # Optional: Cluster columns
+  cluster_rows = F, # Optional: Cluster rows
+  show_row_names = T,
+  show_column_names = TRUE, 
+  row_dend_side = "left",
+  row_names_side = "left",
+  row_names_gp = gpar(fontsize = 10, fontface= "bold" ),
+  width = unit(7, "cm"),
+  heatmap_height = unit(12, "cm"),
+  column_names_gp = gpar(fontsize = 7), 
+  column_labels = rep(c(1,2,3),2),
+  column_names_rot = 360,
+  column_title = "Donors", 
+  column_title_side = "bottom",
+  show_heatmap_legend = T, 
+  col = col_fun
+)
+
+
+draw(ht,  heatmap_legend_side = "right" , annotation_legend_side = "right" )
+
+```
+
+## enrichment for the downregulated genes
+
+```{r}
+dwn_sig<- sig_genes_edger[sig_genes_edger$logFC<0,]
+
+dwn_genes<- dwn_sig$SYMBOL
+
+clusterprofiler_res_dwn<- enrichGO(dwn_genes,
+                               keyType = "SYMBOL",
+                               ont="BP",
+                               OrgDb =  "org.Hs.eg.db",
+                               pvalueCutoff=0.05,
+                               pAdjustMethod="BH",
+                               qvalueCutoff = 0.2,
+                               minGSSize = 10,
+                               maxGSSize = 500)
+
+
+clusterprofiler_res_dwn<- clusterprofiler_res_dwn@result[clusterprofiler_res_dwn@result$p.adjust<=0.05, ]
+
+View(clusterprofiler_res_dwn)
+```
+
+# Gene Set Variation Analysis-GSVA
+
+```{r}
+
+exprs_mat <- assay(dds_LR)
+
+exprs_mat <- exprs_mat[!grepl("^transcript", rownames(exprs_mat)), ]
+
+
+exprs_mat <- exprs_mat[rowSums(exprs_mat) > 6,]
+
+
+genes_exprs_mat <- rownames(exprs_mat)
+
+genes_exprs_mat <- mapIds(
+  org.Hs.eg.db,
+  keys = genes_exprs_mat,
+  column = "SYMBOL",
+  keytype = "ENSEMBL",
+  multiVals = "first"
+)
+
+exprs_df<- as.data.frame(exprs_mat)
+exprs_df$SYMBOL<- genes_exprs_mat
+
+# calculating the variance
+
+exprs_df$variance <- apply(exprs_df[ , !(names(exprs_df) %in% c("SYMBOL"))], 1, var, na.rm = TRUE)
+
+# 2. Keep the most variable transcript per gene symbol
+exprs_highvar <- exprs_df %>%
+  group_by(SYMBOL) %>%
+  slice_max(order_by = variance, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+# 3. Remove helper column
+exprs_highvar <- exprs_highvar %>% dplyr::select(-variance)
+
+# 4. Set SYMBOL as rownames
+exprs_highvar <- as.data.frame(exprs_highvar)
+
+exprs_highvar<- na.omit(exprs_highvar)
+rownames(exprs_highvar) <- exprs_highvar$SYMBOL
+exprs_highvar$SYMBOL <- NULL
+
+exprs_highvar<- as.matrix(exprs_highvar)
+
+# run GSVA
+
+goannot <- AnnotationDbi::select(org.Hs.eg.db, keys = keys(org.Hs.eg.db, keytype = "SYMBOL"), columns = "GOALL", keytype = "SYMBOL")
+
+genesbygo <- split(goannot$SYMBOL, goannot$GO)
+
+huangPar <- gsvaParam(exprs_highvar, genesbygo, minSize = 5, maxSize = 2000)
+
+esmicro <- gsva(huangPar)
+
+# adding a column for GO id description
+
+go_ids <- rownames(esmicro)
+
+# Get the term names
+go_terms <- Term(GOTERM[go_ids])
+# Add as a new column
+esmicro<- as.data.frame(esmicro)
+esmicro$Description <- go_terms
+rownames(esmicro)<- esmicro$Description
+esmicro<- esmicro[, -7]
+
+
+# Applying Limma on GSVA matrix to extract differentially expressed pathways
+
+# creating metadata
+
+patient <- rep(c("p1", "p2", "p3"), 2)
+dose <- c(rep("0Gy", 3), rep("4Gy", 3))
+metadata <- data.frame(patient, dose)
+
+# make the design
+
+f <- factor(paste(metadata$dose))
+
+design <- model.matrix(~ 0 + f)
+
+patient <- as.factor(metadata$patient)
+
+# limma-based DEA
+
+corfit <- duplicateCorrelation(esmicro, design, block = patient)
+
+fit <- lmFit(esmicro, design, block = patient, correlation = corfit$consensus)
+
+contrast.matrix <- makeContrasts((f4Gy-f0Gy), levels = design)
+
+fit2 <- contrasts.fit(fit, contrast.matrix)
+
+fit2 <- eBayes(fit2)
+
+results_gsva <- topTable(fit2, coef = 1, number = nrow(esmicro), adjust = "BH")
+
+results_f_gsva <- decideTests(fit2, p.value = 0.05)
+
+summary(results_f_gsva)
+
+
+results_f_gsva<- as.data.frame(results_f_gsva)
+
+
+sig_gsva <- results_f_gsva[results_f_gsva[, 1] == 1, ]
+
+```
+
+## GSEA using GO terms
+
+```{r}
+
+
+## background genes
+
+background_genes <- edger_gene_res$table%>%
+  as.data.frame() %>%
+  filter(logCPM != 0) %>%
+  tibble::rownames_to_column(var = "gene") %>%
+  pull(gene)
+
+
+res_df <- edger_gene_res$table %>%
+  as.data.frame() %>%
+  filter(logCPM != 0) %>%
+  tibble::rownames_to_column(var = "gene")
+
+background_genes_map <- bitr(
+  geneID = background_genes,
+  fromType = "ENSEMBL",
+  toType = "SYMBOL",
+  OrgDb = "org.Hs.eg.db"
+)
+
+
+m_df <- msigdbr(species = "Homo sapiens")
+
+head(m_df)
+
+go_df <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "BP") %>% dplyr::select(gs_name, gene_symbol)
+
+
+
+# table(m_t2g$gs_name)
+# head(m_t2g)
+
+### Gene set enrichment analysis
+
+## rank all the genes by signed fold change * -log10pvalue.
+
+res_df <- res_df %>%
+  mutate(signed_rank_stats = sign(logFC) * -log10(PValue)) %>%
+  left_join(background_genes_map, by = c("gene" = "ENSEMBL")) %>%
+  arrange(desc(signed_rank_stats))
+
+# removing duplicates by choosing the ones with FDR <=0.05
+
+res_df_filtered <- res_df %>%
+  dplyr::group_by(SYMBOL) %>%
+  dplyr::arrange(FDR, .by_group = TRUE) %>%
+  dplyr::slice(        # keep logic per group
+    if (any(FDR <= 0.05)) which.min(FDR) else 1
+  ) %>%
+  dplyr::ungroup()
+
+
+res_df_filtered<- na.omit(res_df_filtered)
+
+gene_list <- res_df_filtered$signed_rank_stats
+names(gene_list) <- res_df_filtered$SYMBOL
+gene_list <- sort(gene_list, decreasing = TRUE)
+
+
+em2 <- GSEA(gene_list, TERM2GENE = go_df)
+
+em2@result %>% View()
+
+write.csv(em2@result, "GSEA_results.csv")
+
+### visualization
+
+p1 <- gseaplot(em2,
+  geneSetID = "GOBP_PEPTIDE_ANTIGEN_ASSEMBLY_WITH_MHC_CLASS_II_PROTEIN_COMPLEX",
+  by = "runningScore", title = "GOBP_PEPTIDE_ANTIGEN_ASSEMBLY_WITH_MHC_CLASS_II_PROTEIN_COMPLEX"
+)
+
+p2 <- gseaplot(em2,
+  geneSetID = "GOBP_HUMORAL_IMMUNE_RESPONSE",
+  by = "runningScore", title = "GOBP_HUMORAL_IMMUNE_RESPONSE"
+)
+
+p1 / p2
+
+#ggsave("GSEA.png", plot = p1 / p2, width = 7, height = 6, dpi = 400)
+
+```
+
+
+
+# Transdecoder
+
+```{r}
+
+# Read protein FASTA file
+pep <- readAAStringSet("novel_isoforms_n.fa.transdecoder.pep")
+
+# Inspect
+pep
+names(pep)[1:5]     # transcript IDs
+width(pep)[1:5]     # sequence lengths
+pep[1]              # first sequence
+
+# convert to df
+headers <- names(pep)
+seqs <- as.character(pep)
+
+# Parse each header
+pep_df <- tibble(
+  transcript_id = headers,
+  sequence = seqs,
+  orf_type = str_extract(headers, "(?<=ORF type:)\\w+"),
+  strand = str_extract(headers, "(?<=\\()(\\+|\\-)\\)(?=,score=)"),
+  score = str_extract(headers, "(?<=score=)[0-9.]+") %>% as.numeric(),
+  length = str_extract(headers, "(?<=len:)\\d+") %>% as.numeric(),
+  start = str_extract(headers, "(?<=:)\\d+(?=-)") %>% as.numeric(),
+  end = str_extract(headers, "(?<=-)\\d+(?=\\([+-]\\))") %>% as.numeric(),
+  coord_strand = str_extract(headers, "(?<=\\d\\()[+-](?=\\))")
+)
+
+pep_df <- pep_df %>%
+  mutate(final_strand = ifelse(!is.na(coord_strand), coord_strand, strand)) %>%
+  dplyr::select(-strand, -coord_strand)
+
+# filter on the tx that are potentially coding genes
+
+pep_df_strict <- pep_df %>%
+  dplyr::filter(
+    score >= 100,
+    orf_type == "complete"
+  )
+
+
+pep_df$clean_id <- sub("^([^.]+\\.[^.]+\\.[^.]+).*", "\\1", pep_df[[1]])
+
+pep_df_strict$clean_id <- sub("^([^.]+\\.[^.]+\\.[^.]+).*", "\\1", pep_df_strict[[1]])
+
+
+
+
+```
+
+# CPC2
+
+```{r}
+
+novel_isoforms_fa<- readAAStringSet("novel_isoforms_n.fa")
+
+
+
+novel_isoforms_fa_df<- as.data.frame(novel_isoforms_fa)
+
+# focusing on the 8 transcripts detected by transdecoder
+
+selected_8_tx<- c("transcript13458.chr22.nnic", "transcript13760.chr9.nnic", "transcript13826.chr15", "transcript15213.chr10.nnic", "transcript21609.chr6.nnic", "transcript21664.chr9.nnic", "transcript23187.chr5.nnic", "transcript36523.chr12.nnic")
+
+selected_tx_fa<- novel_isoforms_fa_df[selected_8_tx,]
+
+
+ids <- paste0("seq", seq_along(selected_tx_fa))
+
+fa_file <- "selected_tx.fa"
+writeLines(
+  paste0(">", ids, "\n", selected_tx_fa),
+  con = fa_file
+)
+
+
+
+cpc_res<- read.table("cpc_res.txt")
+colnames(cpc_res)<- c("ID",	"peptide_length","Fickett_score",	"pI",	"ORF_integrity",	"coding_probability",	"label")
+
+cpc_res_coding <- cpc_res[cpc_res$label =="coding",]
+cpc_res_noncoding <- cpc_res[cpc_res$label =="noncoding",]
+
+
+```
+
+# Gffcompare
+
+```{r}
+
+tmap <- read.table("Isoquant/OUT/gffcmp_out.OUT.transcript_models.gtf.tmap",
+        sep = "\t", header = FALSE, quote = "", stringsAsFactors = FALSE, fill = TRUE)
+
+# 3. Filter the tmap file to keep only those novel transcripts
+
+selected_8_tx<- c("transcript13458.chr22.nnic", "transcript13760.chr9.nnic", "transcript13826.chr15.nnic", "transcript15213.chr10.nnic", "transcript21609.chr6.nnic", "transcript21664.chr9.nnic", "transcript23187.chr5.nnic", "transcript36523.chr12.nnic")
+
+
+tmap_novel <- tmap %>% 
+  filter(V5 %in% selected_8_tx)
+
+tmap_novel_full <- tmap %>% 
+  filter(V5 %in% rownames(sig_novel_tx))
+
+colnames(tmap_novel)<- tmap[1,]
+colnames(tmap_novel_full)<- tmap[1,]
+
+tmap_novel_full[,1]<- gsub("\\..*", "", tmap_novel_full[,1])
+
+tmap_novel_full$SYMBOL <- mapIds(
+  org.Hs.eg.db,
+  keys = tmap_novel_full$ref_gene_id,
+  column = "SYMBOL",
+  keytype = "ENSEMBL",
+  multiVals = "first"
+)
+
+```
+
+# CPAT
+
+```{r}
+
+cpat_res <- read_tsv("cpat_results.txt.ORF_prob.best.tsv") 
+
+cpat_res_coding<- cpat_res[ cpat_res$Coding_prob>=0.5,]
+
+View(cpat_res_coding)
+
+
+```
+
+```{r}
+venn.plot <- venn.diagram(
+  x = list(
+    TransDecoder = unique(pep_df$clean_id),
+    CPC2 = cpc_res_coding$ID,
+    CPAT = tolower(cpat_res_coding$seq_ID)
+  ),
+  filename = NULL,  # Plot to R directly
+  fill = c("#66c2a5", "#8da0cb", "orange"),
+  alpha = 0.6,
+  cat.cex = 1.2,
+  cex = 1.5,
+#  main = "Novel coding isoforms"
+)
+
+grid::grid.draw(venn.plot)
+
+
+#the transcript that exist only on cpat (transcript37812.chr6.nnic), if at all, could be a coding one. it is labeled non coding in cpc 2 but its coding probability is 0.34. however, it doesnt exist at all in transdecoder output
+# the transcript that exist in transdecoder only (transcript25470.chr1.nic) doesnt exist at all in cpat output and it as very low coding prob in cpc2 0.00349659
+
+
+# out of the 2 transcripts that were shared between transdecoder and cpat but not cpc2 is CDKN1a. this one has high potentiality for being coding as well. CPC score is 0.44, gffcompare class code is j, cpat score is 0.8. ORF length is 120 aa, has 3 exons, nucleotide seq of 1170, and complete ORF type. also 26% query coverage with blastx
+
+
+TransDecoder <- tolower(unique(pep_df$clean_id))
+CPC2         <- tolower(cpc_res_coding$ID)
+CPAT         <- tolower(cpat_res_coding$seq_ID)
+
+shared_transcripts <- Reduce(intersect, list(TransDecoder, CPC2, CPAT))
+length(shared_transcripts)
+
+```
+
+
+```{r}
+
+
+# For CPAT: classify based on coding probability threshold
+cpat_res_labeled <- cpat_res %>%
+  mutate(tool = "CPAT",
+         label = ifelse(Coding_prob >= 0.5, "Coding", "Non-coding"))
+
+# For CPC2: assume the column is named 'coding' or similar
+cpc_res_labeled <- cpc_res %>%
+  mutate(tool = "CPC2",
+         label = ifelse(tolower(label) == "coding", "Coding", "Non-coding"))
+
+# --- TransDecoder ---
+# You mentioned there are 14 total transcripts (11 unique) with ORFs
+# Let's get unique ones
+transdecoder_unique <- unique(pep_df$clean_id)
+
+# Total number of isoforms in your dataset (e.g., 26 total)
+total_isoforms <- 26  # <-- change this to your real total number
+
+# Compute counts
+transdecoder_df <- tibble(
+  tool = "TransDecoder",
+  label = c("Coding", "Non-coding"),
+  count = c(length(transdecoder_unique), total_isoforms - length(transdecoder_unique))
+)
+
+
+# Count per tool and label
+summary_df <- bind_rows(cpat_res_labeled, cpc_res_labeled) %>%
+  count(tool, label, name = "count")
+
+# Add TransDecoder data
+summary_df <- bind_rows(summary_df, transdecoder_df)
+
+ggplot(summary_df, aes(x = tool, y = count, fill = label)) +
+  geom_col(position = "stack") +
+  scale_fill_manual(values = c("Coding" = "steelblue", "Non-coding" = "orange")) +
+  labs(
+    title = "Comparison of Coding vs Non-coding Transcripts Across Tools",
+    x = "Tool",
+    y = "Count",
+    fill = "Transcript Type"
+  ) +
+  theme_minimal(base_size = 14)
+
+```
+
+# Session info
+
+```{r}
+sessionInfo()
+```
+
