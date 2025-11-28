@@ -54,7 +54,7 @@ library("stringr")
 
 ## Loading the long read -gene level- data
 ```{r}
-dds_LR <- readRDS("~/Phybion_Pilot_LR/dds_LR.RDS")
+dds_LR <- readRDS("dds_LR_pseudonymized.RDS")
 
 # Variance stabilizing transformation
 
@@ -95,9 +95,9 @@ LR_Tx_counts <- LR_Tx_counts[, -1]
 LR_Tx_counts <- LR_Tx_counts[rowSums(LR_Tx_counts) > 6, ]
 # naming the columns
 
-colnames(LR_Tx_counts_filtered) <- c("0Gy-F", "0Gy-A", "0Gy-S", "4Gy-F", "4Gy-A", "4Gy-S")
+colnames(LR_Tx_counts_filtered) <- c("0Gy-do1", "0Gy-do2", "0Gy-do3", "4Gy-do1", "4Gy-do2", "4Gy-do3")
 
-colnames(LR_Tx_counts) <- c("0Gy-F", "0Gy-A", "0Gy-S", "4Gy-F", "4Gy-A", "4Gy-S")
+colnames(LR_Tx_counts) <- c("0Gy-do1", "0Gy-do2", "0Gy-do3", "4Gy-do1", "4Gy-do2", "4Gy-do3")
 ```
 
 # Data exploration
@@ -270,7 +270,7 @@ tx_mat <- LR_Tx_counts_full
 rownames(tx_mat) <- tx_mat$V1
 tx_mat <- tx_mat[, -1]
 
-colnames(tx_mat) <- c("0Gy-F", "0Gy-A", "0Gy-S", "4Gy-F", "4Gy-A", "4Gy-S")
+colnames(tx_mat) <- c("0Gy-do1", "0Gy-do2", "0Gy-do3", "4Gy-do1", "4Gy-do2", "4Gy-do3")
 
 
 dds_tx <- DESeqDataSetFromMatrix(
