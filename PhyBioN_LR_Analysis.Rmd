@@ -75,7 +75,7 @@ LR_metadata <- colData
 LR_Tx_counts <- read.table(file = "./Isoquant/OUT/OUT.transcript_model_grouped_counts.tsv")
 
 # Transcript counts
-# Removing un-annotated transcripts since they cannot be used for diff splice analysis
+# Removing un-annotated transcripts since they cannot be used for diffsplice analysis
 
 LR_Tx_counts_filtered <- LR_Tx_counts[!grepl("^transcript", LR_Tx_counts$V1), ]
 
@@ -105,6 +105,7 @@ colnames(LR_Tx_counts) <- c("0Gy-F", "0Gy-A", "0Gy-S", "4Gy-F", "4Gy-A", "4Gy-S"
 ## PCA plot
 
 ```{r}
+
 pca_plot_LR <- plotPCA(vsd_LR,
                        intgroup = c("Donors", "Dose"),
                        returnData = TRUE
@@ -151,7 +152,147 @@ PCA_LR + ggpt
 # There is a strong interdonor variation which has to be accounted for in the design before DEA
 ```
 
-# EdgeR_DEA
+## Creating gene plotting function
+
+```{r}
+plot_gene_modified <- function(dds, gene, intgroup = "condition", assay = "counts",
+                               annotation_obj = NULL, normalized = TRUE, transform = TRUE,
+                               labels_display = FALSE, labels_repel = TRUE, plot_type = "auto",
+                               return_data = FALSE, color_by = "Donors") {
+  plot_type <- match.arg(plot_type, c("auto", "jitteronly", "boxplot", "violin", "sina"))
+  
+  if (!(all(intgroup %in% colnames(colData(dds))))) {
+    stop("`intgroup` not found in the colData slot of the dds object.")
+  }
+  
+  df <- get_expr_values(
+    de_container = dds, gene = gene, intgroup = intgroup,
+    assay = assay, normalized = normalized
+  )
+  df$sample_id <- rownames(df)
+  
+  # Add Donors column if it exists
+  if ("Donors" %in% colnames(colData(dds))) {
+    df$Donors <- colData(dds)[, "Donors"]
+  } else {
+    stop("The `Donors` column is missing in the colData of the dds object.")
+  }
+  
+  # Add gene annotation if provided
+  if (!is.null(annotation_obj)) {
+    genesymbol <- annotation_obj$gene_name[match(gene, annotation_obj$gene_id)]
+  } else {
+    genesymbol <- gene
+  }
+  
+  onlyfactors <- df[, match(intgroup, colnames(df))]
+  df$plotby <- interaction(onlyfactors)
+  min_by_groups <- min(table(df$plotby))
+  
+  if (return_data) {
+    return(df)
+  }
+  
+  p <- ggplot(df, aes(x = .data$plotby, y = .data$exp_value, col = .data[[color_by]])) +
+    scale_x_discrete(name = "") +
+    scale_color_discrete(name = "Experimental\ngroup") +
+    theme_bw()
+  
+  jit_pos <- position_jitter(width = 0.2, height = 0, seed = 42)
+  
+  # Plot individual points
+  p <- p + geom_point(position = jit_pos, shape = 16, size = 3)
+  
+  # Display labels if required
+  if (labels_display) {
+    if (labels_repel) {
+      p <- p + ggrepel::geom_text_repel(aes(label = .data$sample_id),
+                                        min.segment.length = 0, position = jit_pos
+      )
+    } else {
+      p <- p + geom_text(aes(label = .data$sample_id), hjust = -0.1, vjust = 0.1, position = jit_pos)
+    }
+  }
+  
+  
+  y_label <- if (assay == "counts" & normalized) {
+    "Normalized counts"
+  } else if (assay == "counts" & !normalized) {
+    "Counts"
+  } else if (assay == "abundance") {
+    "TPM - Transcripts Per Million"
+  } else {
+    assay
+  }
+  
+  if (transform) {
+    p <- p + scale_y_log10(name = paste0(y_label, " (log10 scale)"))
+  } else {
+    p <- p + scale_y_continuous(name = y_label)
+  }
+  
+  p <- p + labs(title = paste0(genesymbol, " - ", gene))
+  
+  return(p)
+}
+```
+
+
+## Checking the gene pattern across doses
+
+```{r}
+anno_df <- get_annotation_orgdb(
+  de_container = dds_LR,
+  orgdb_package = "org.Hs.eg.db",
+  id_type = "ENSEMBL"
+)
+
+
+gene_plot <- plot_gene_modified(
+  dds = dds_LR,
+  gene = c("ENSG00000124762"),
+  intgroup = "Dose",
+  annotation_obj = anno_df
+) + ggpt
+
+gene_plot
+
+# ggsave("cd83.png", plot = gene_plot, width = 8, height = 5, dpi = 400)
+```
+
+## plotting transcripts dose-response
+
+```{r}
+
+LR_Tx_counts_full <- read.table(file = "./Isoquant/OUT/OUT.transcript_model_grouped_counts.tsv")
+
+tx_mat <- LR_Tx_counts_full
+rownames(tx_mat) <- tx_mat$V1
+tx_mat <- tx_mat[, -1]
+
+colnames(tx_mat) <- c("0Gy-F", "0Gy-A", "0Gy-S", "4Gy-F", "4Gy-A", "4Gy-S")
+
+
+dds_tx <- DESeqDataSetFromMatrix(
+  countData = tx_mat,
+  colData = LR_metadata,
+  design = ~ Dose + Donors
+)
+
+# ENST00000440815 ENST00000325568
+
+plot_gene_modified(
+  dds = dds_tx,
+  gene = c("ENST00000325568.9"),
+  intgroup = "Dose",
+  annotation_obj = anno_df
+) +
+  labs(
+    title = "IL-32 - ENST00000325568"
+  ) + ggpt
+```
+
+# Differential Expression Analysis- EdgeR
 
 ## gene level DEA
 
@@ -228,6 +369,7 @@ sig_genes_edger$SYMBOL <- mapIds(
 ## Volcanoplot
 
 ```{r}
+
 de_res <- edger_gene_res$table
 
 top_genes <- de_res[order(de_res$FDR), ][1:10, ]
@@ -264,147 +406,7 @@ g <- ggplot(de_res, aes(x = logFC, y = -log10(FDR), color = diffexpressed)) +
   ggpt
 
 g
-```
-## Creating gene plotting function
 
-```{r}
-plot_gene_modified <- function(dds, gene, intgroup = "condition", assay = "counts",
-                               annotation_obj = NULL, normalized = TRUE, transform = TRUE,
-                               labels_display = FALSE, labels_repel = TRUE, plot_type = "auto",
-                               return_data = FALSE, color_by = "Donors") {
-  plot_type <- match.arg(plot_type, c("auto", "jitteronly", "boxplot", "violin", "sina"))
-  
-  if (!(all(intgroup %in% colnames(colData(dds))))) {
-    stop("`intgroup` not found in the colData slot of the dds object.")
-  }
-  
-  df <- get_expr_values(
-    de_container = dds, gene = gene, intgroup = intgroup,
-    assay = assay, normalized = normalized
-  )
-  df$sample_id <- rownames(df)
-  
-  # Add Donors column if it exists
-  if ("Donors" %in% colnames(colData(dds))) {
-    df$Donors <- colData(dds)[, "Donors"]
-  } else {
-    stop("The `Donors` column is missing in the colData of the dds object.")
-  }
-  
-  # Add gene annotation if provided
-  if (!is.null(annotation_obj)) {
-    genesymbol <- annotation_obj$gene_name[match(gene, annotation_obj$gene_id)]
-  } else {
-    genesymbol <- gene
-  }
-  
-  onlyfactors <- df[, match(intgroup, colnames(df))]
-  df$plotby <- interaction(onlyfactors)
-  min_by_groups <- min(table(df$plotby))
-  
-  if (return_data) {
-    return(df)
-  }
-  
-  p <- ggplot(df, aes(x = .data$plotby, y = .data$exp_value, col = .data[[color_by]])) +
-    scale_x_discrete(name = "") +
-    scale_color_discrete(name = "Experimental\ngroup") +
-    theme_bw()
-  
-  jit_pos <- position_jitter(width = 0.2, height = 0, seed = 42)
-  
-  # Plot individual points
-  p <- p + geom_point(position = jit_pos, shape = 16, size = 3)
-  
-  # Display labels if required
-  if (labels_display) {
-    if (labels_repel) {
-      p <- p + ggrepel::geom_text_repel(aes(label = .data$sample_id),
-                                        min.segment.length = 0, position = jit_pos
-      )
-    } else {
-      p <- p + geom_text(aes(label = .data$sample_id), hjust = -0.1, vjust = 0.1, position = jit_pos)
-    }
-  }
-  
-  # Add a connected mean line across all groups
-  #  p <- p + stat_summary(fun = mean, geom = "line", aes(group = 1),
-  #                       color = "grey80", linewidth = 0.8)
-  
-  y_label <- if (assay == "counts" & normalized) {
-    "Normalized counts"
-  } else if (assay == "counts" & !normalized) {
-    "Counts"
-  } else if (assay == "abundance") {
-    "TPM - Transcripts Per Million"
-  } else {
-    assay
-  }
-  
-  if (transform) {
-    p <- p + scale_y_log10(name = paste0(y_label, " (log10 scale)"))
-  } else {
-    p <- p + scale_y_continuous(name = y_label)
-  }
-  
-  p <- p + labs(title = paste0(genesymbol, " - ", gene))
-  
-  return(p)
-}
-```
-
-
-## Checking the gene pattern across doses
-
-```{r}
-anno_df <- get_annotation_orgdb(
-  de_container = dds_LR,
-  orgdb_package = "org.Hs.eg.db",
-  id_type = "ENSEMBL"
-)
-
-
-gene_plot <- plot_gene_modified(
-  dds = dds_LR,
-  gene = c("ENSG00000124762"),
-  intgroup = "Dose",
-  annotation_obj = anno_df
-) + ggpt
-
-gene_plot
-
-# ggsave("cd83.png", plot = gene_plot, width = 8, height = 5, dpi = 400)
-```
-
-# plotting tx
-
-```{r}
-LR_Tx_counts_full <- read.table(file = "./Isoquant/OUT/OUT.transcript_model_grouped_counts.tsv")
-
-tx_mat <- LR_Tx_counts_full
-rownames(tx_mat) <- tx_mat$V1
-tx_mat <- tx_mat[, -1]
-
-colnames(tx_mat) <- c("0Gy-F", "0Gy-A", "0Gy-S", "4Gy-F", "4Gy-A", "4Gy-S")
-
-
-dds_tx <- DESeqDataSetFromMatrix(
-  countData = tx_mat,
-  colData = LR_metadata,
-  design = ~ Dose + Donors
-)
-
-# ENST00000440815 ENST00000325568
-
-plot_gene_modified(
-  dds = dds_tx,
-  gene = c("ENST00000325568.9"),
-  intgroup = "Dose",
-  annotation_obj = anno_df
-) +
-  labs(
-    title = "IL-32 - ENST00000325568"
-  ) + ggpt
 ```
 
 ## transcript level DEA
@@ -469,6 +471,7 @@ hist(edger_Tx_res$table$PValue)
 ## Preparing the matrix for the analysis
 
 ```{r}
+
 LR_Tx_counts_filtered <- as.data.frame(LR_Tx_counts_filtered)
 LR_Tx_counts_filtered$feature_id <- rownames(LR_Tx_counts_filtered)
 
@@ -504,6 +507,7 @@ LR_Tx_counts_filtered <- na.omit(LR_Tx_counts_filtered)
 ```
 
 ## running diffsplice
+
 ```{r}
 mat <- as.matrix(LR_Tx_counts_filtered[, -c(1, 2)])
 rownames(mat) <- LR_Tx_counts_filtered$feature_id
@@ -535,7 +539,7 @@ ts <- topSplice(ex, number = Inf)
 ts.tx <- topSplice(ex, test = "t", number = Inf)
 ```
 
-## StageR
+### StageR
 
 ```{r}
 pScreen <- ts$P.Value
@@ -882,11 +886,6 @@ head(m_df)
 
 go_df <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "BP") %>% dplyr::select(gs_name, gene_symbol)
 
-
-
-# table(m_t2g$gs_name)
-# head(m_t2g)
-
 ### Gene set enrichment analysis
 
 ## rank all the genes by signed fold change * -log10pvalue.
@@ -934,14 +933,13 @@ p2 <- gseaplot(em2,
 
 p1 / p2
 
-# ggsave("GSEA.png", plot = p1 / p2, width = 7, height = 6, dpi = 400)
 ```
 
-
-
-# Transdecoder
+# Checking novel significant transcripts coding potential
+## Transdecoder
 
 ```{r}
+
 # Read protein FASTA file
 pep <- readAAStringSet("novel_isoforms_n.fa.transdecoder.pep")
 
@@ -986,7 +984,7 @@ pep_df$clean_id <- sub("^([^.]+\\.[^.]+\\.[^.]+).*", "\\1", pep_df[[1]])
 pep_df_strict$clean_id <- sub("^([^.]+\\.[^.]+\\.[^.]+).*", "\\1", pep_df_strict[[1]])
 ```
 
-# CPC2
+## CPC2
 
 ```{r}
 novel_isoforms_fa <- readAAStringSet("novel_isoforms_n.fa")
@@ -1017,9 +1015,10 @@ colnames(cpc_res) <- c("ID", "peptide_length", "Fickett_score", "pI", "ORF_integ
 
 cpc_res_coding <- cpc_res[cpc_res$label == "coding", ]
 cpc_res_noncoding <- cpc_res[cpc_res$label == "noncoding", ]
+
 ```
 
-# Gffcompare
+## Gffcompare
 
 ```{r}
 tmap <- read.table("Isoquant/OUT/gffcmp_out.OUT.transcript_models.gtf.tmap",
@@ -1051,7 +1050,7 @@ tmap_novel_full$SYMBOL <- mapIds(
 )
 ```
 
-# CPAT
+## CPAT
 
 ```{r}
 cpat_res <- read_tsv("cpat_results.txt.ORF_prob.best.tsv")
@@ -1060,6 +1059,8 @@ cpat_res_coding <- cpat_res[cpat_res$Coding_prob >= 0.5, ]
 
 View(cpat_res_coding)
 ```
+
+### focusing only on the novel coding transcripts that are shared between all the methods
 
 ```{r}
 venn.plot <- venn.diagram(
@@ -1079,21 +1080,16 @@ venn.plot <- venn.diagram(
 grid::grid.draw(venn.plot)
 
 
-# the transcript that exist only on cpat (transcript37812.chr6.nnic), if at all, could be a coding one. it is labeled non coding in cpc 2 but its coding probability is 0.34. however, it doesnt exist at all in transdecoder output
-# the transcript that exist in transdecoder only (transcript25470.chr1.nic) doesnt exist at all in cpat output and it as very low coding prob in cpc2 0.00349659
-
-
-# out of the 2 transcripts that were shared between transdecoder and cpat but not cpc2 is CDKN1a. this one has high potentiality for being coding as well. CPC score is 0.44, gffcompare class code is j, cpat score is 0.8. ORF length is 120 aa, has 3 exons, nucleotide seq of 1170, and complete ORF type. also 26% query coverage with blastx
-
-
 TransDecoder <- tolower(unique(pep_df$clean_id))
 CPC2 <- tolower(cpc_res_coding$ID)
 CPAT <- tolower(cpat_res_coding$seq_ID)
 
 shared_transcripts <- Reduce(intersect, list(TransDecoder, CPC2, CPAT))
 length(shared_transcripts)
+
 ```
 
+### plotting the number of coding and non coding novel transcripts detected by each method
 
 ```{r}
 # For CPAT: classify based on coding probability threshold
@@ -1111,7 +1107,7 @@ cpc_res_labeled <- cpc_res %>%
   )
 
 # --- TransDecoder ---
-# You mentioned there are 14 total transcripts (11 unique) with ORFs
+# there are 14 total transcripts (11 unique) with ORFs
 # Let's get unique ones
 transdecoder_unique <- unique(pep_df$clean_id)
 
