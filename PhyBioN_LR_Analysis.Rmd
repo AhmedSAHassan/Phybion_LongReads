@@ -397,7 +397,7 @@ g <- ggplot(de_res, aes(x = logFC, y = -log10(FDR), color = diffexpressed)) +
     color = "black"
   ) +
   geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "grey") +
-  xlim(c(-14, 14)) +
+  xlim(c(-7, 7)) +
   xlab("log2 fold change") +
   ylab("-log10 FDR") +
   scale_color_manual(values = c("blue", "grey", "red")) +
