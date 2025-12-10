@@ -1018,38 +1018,6 @@ cpc_res_noncoding <- cpc_res[cpc_res$label == "noncoding", ]
 
 ```
 
-## Gffcompare
-
-```{r}
-tmap <- read.table("Isoquant/OUT/gffcmp_out.OUT.transcript_models.gtf.tmap",
-                   sep = "\t", header = FALSE, quote = "", stringsAsFactors = FALSE, fill = TRUE
-)
-
-# 3. Filter the tmap file to keep only those novel transcripts
-
-selected_8_tx <- c("transcript13458.chr22.nnic", "transcript13760.chr9.nnic", "transcript13826.chr15.nnic", "transcript15213.chr10.nnic", "transcript21609.chr6.nnic", "transcript21664.chr9.nnic", "transcript23187.chr5.nnic", "transcript36523.chr12.nnic")
-
-
-tmap_novel <- tmap %>%
-  filter(V5 %in% selected_8_tx)
-
-tmap_novel_full <- tmap %>%
-  filter(V5 %in% rownames(sig_novel_tx))
-
-colnames(tmap_novel) <- tmap[1, ]
-colnames(tmap_novel_full) <- tmap[1, ]
-
-tmap_novel_full[, 1] <- gsub("\\..*", "", tmap_novel_full[, 1])
-
-tmap_novel_full$SYMBOL <- mapIds(
-  org.Hs.eg.db,
-  keys = tmap_novel_full$ref_gene_id,
-  column = "SYMBOL",
-  keytype = "ENSEMBL",
-  multiVals = "first"
-)
-```
-
 ## CPAT
 
 ```{r}
@@ -1087,6 +1055,34 @@ CPAT <- tolower(cpat_res_coding$seq_ID)
 shared_transcripts <- Reduce(intersect, list(TransDecoder, CPC2, CPAT))
 length(shared_transcripts)
 
+```
+
+## Gffcompare
+
+```{r}
+tmap <- read.table("Isoquant/OUT/gffcmp_out.OUT.transcript_models.gtf.tmap",
+                   sep = "\t", header = FALSE, quote = "", stringsAsFactors = FALSE, fill = TRUE
+)
+
+# 3. Filter the tmap file to keep only those novel transcripts
+
+
+
+tmap_novel_coding <- tmap %>%
+  filter(V5 %in% shared_transcripts)
+
+colnames(tmap_novel_coding) <- tmap[1, ]
+
+
+tmap_novel_coding[, 1] <- gsub("\\..*", "", tmap_novel_coding[, 1])
+
+tmap_novel_coding$SYMBOL <- mapIds(
+  org.Hs.eg.db,
+  keys = tmap_novel_coding$ref_gene_id,
+  column = "SYMBOL",
+  keytype = "ENSEMBL",
+  multiVals = "first"
+)
 ```
 
 ### plotting the number of coding and non coding novel transcripts detected by each method
