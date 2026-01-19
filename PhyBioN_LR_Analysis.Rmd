@@ -201,7 +201,7 @@ plot_gene_modified <- function(dds, gene, intgroup = "condition", assay = "count
   jit_pos <- position_jitter(width = 0.2, height = 0, seed = 42)
   
   # Plot individual points
-  p <- p + geom_point(position = jit_pos, shape = 16, size = 3)
+  p <- p + geom_point(position = jit_pos, shape = 16, size = 4)
   
   # Display labels if required
   if (labels_display) {
@@ -279,17 +279,78 @@ dds_tx <- DESeqDataSetFromMatrix(
   design = ~ Dose + Donors
 )
 
+dds_tx<- BIUMmisc::dds_gencode_to_ensembl(dds_tx)
 # ENST00000440815 ENST00000325568
 
-plot_gene_modified(
+p1 <- plot_gene_modified(
   dds = dds_tx,
-  gene = c("ENST00000325568.9"),
+  gene = c("ENST00000325568"),
   intgroup = "Dose",
   annotation_obj = anno_df
 ) +
   labs(
-    title = "IL-32 - ENST00000325568"
-  ) + ggpt
+    title = "IL-32 - ENST00000325568",
+    y= "Normalized counts (log10 scale)",
+    x = "Dose"
+  ) + ggpt+ scale_y_continuous(
+    limits = c(0, 200),
+    expand = expansion(mult = 0)
+  ) + theme(legend.position = "none")
+
+
+p2 <- plot_gene_modified(
+  dds = dds_tx,
+  gene = c("ENST00000440815"),
+  intgroup = "Dose",
+  annotation_obj = anno_df
+) +
+  labs(
+    title = "IL-32 - ENST00000440815", 
+    y= "Normalized counts (log10 scale)",
+    x = "Dose"
+  ) + ggpt + scale_y_continuous(
+    limits = c(0, 200),
+    expand = expansion(mult = 0)
+  )+ theme(legend.position = "none")
+
+ p1 +p2
+ 
+ 
+# 
+# # having them in one plot with different data point shapes for each transcript
+# 
+# # Extract data for both transcripts
+# df1 <- plot_gene_modified(
+#   dds = dds_tx,
+#   gene = "ENST00000325568",
+#   intgroup = "Dose",
+#   annotation_obj = anno_df,
+#   return_data = TRUE  # <-- we'll need the raw data; you may need to modify your function to support this
+# ) %>% mutate(transcript = "ENST00000325568")
+# 
+# df2 <- plot_gene_modified(
+#   dds = dds_tx,
+#   gene = "ENST00000440815",
+#   intgroup = "Dose",
+#   annotation_obj = anno_df,
+#   return_data = TRUE
+# ) %>% mutate(transcript = "ENST00000440815")
+# 
+# # Combine
+# combined_df <- bind_rows(df1, df2)
+# 
+# 
+# ggplot(combined_df, aes(x = Dose, y = exp_value, shape = transcript, color = Donors)) +
+#   geom_point(size = 4) +  # bigger dots
+#   scale_y_continuous(limits = c(0, 200), expand = expansion(mult = 0)) +
+#   labs(
+#     y = "Normalized counts (log10 scale)",
+#     x = "Dose",
+#     shape = "Transcript"
+#   ) +
+#   theme_classic() + ggpt
+
+
 ```
 
 # Differential Expression Analysis- EdgeR
@@ -484,12 +545,14 @@ mart <- useEnsembl(
 
 
 transcript_to_gene <- getBM(
-  attributes = c("ensembl_transcript_id", "external_gene_name"),
+  attributes = c("ensembl_transcript_id", 
+                 "ensembl_gene_id",
+                 "external_gene_name",
+                 "description"),
   filters = "ensembl_transcript_id",
   values = LR_Tx_counts_filtered$feature_id,
   mart = mart
 )
-
 
 LR_Tx_counts_filtered <- merge(LR_Tx_counts_filtered, transcript_to_gene,
                                by.x = "feature_id",
@@ -511,6 +574,11 @@ LR_Tx_counts_filtered <- na.omit(LR_Tx_counts_filtered)
 ```{r}
 mat <- as.matrix(LR_Tx_counts_filtered[, -c(1, 2)])
 rownames(mat) <- LR_Tx_counts_filtered$feature_id
+
+# 
+# transcript_to_gene$feature_id <- transcript_to_gene$ensembl_transcript_id 
+# transcript_to_gene$gene_id <- transcript_to_gene$ensembl_gene_id
+
 
 gene_df <- LR_Tx_counts_filtered[, c(1, 2)]
 
@@ -571,9 +639,138 @@ head(ds.padj)
 
 ds.filtered <- ds.padj[ds.padj$transcript <= 0.05, ]
 
+# Keep only transcript_id and external_gene_name
+mapping <- transcript_to_gene %>%
+  dplyr::select(ensembl_transcript_id, external_gene_name)
 
-plotSplice(ex, geneid = "RPS19", genecolname = "gene_id", FDR = 0.05)
+colnames(ds.filtered)[2] <- "ensembl_transcript_id"
+
+# Join with your filtered dataframe
+ds.filtered <- ds.filtered %>%
+  left_join(mapping, by = "ensembl_transcript_id") %>%
+  rename(gene_name = external_gene_name)
+
+
+
+plotSplice(ex, geneid = "ENSG00000004455", genecolname = "gene_id", FDR = 0.05)
+
 ```
+
+### creating the function for DTU plotting
+
+```{r}
+plot_dtu_transcripts <- function(
+  gene_id,
+  LR_Tx_counts = LR_Tx_counts_filtered,
+  dds = dds_tx,
+  dose_samples = list(
+    "0Gy" = c("0Gy-do1", "0Gy-do2", "0Gy-do3"),
+    "4Gy" = c("4Gy-do1", "4Gy-do2", "4Gy-do3")
+  ),
+  log_transform = FALSE,
+  title = NULL,
+  fill_colors = c("0Gy" = "grey", "4Gy" = "firebrick", "Other" = "lightblue")
+) {
+  # Check required packages
+  required_pkgs <- c("dplyr", "tibble", "tidyr", "ggplot2")
+  missing_pkgs <- required_pkgs[!vapply(required_pkgs, requireNamespace, logical(1), quietly = TRUE)]
+  if (length(missing_pkgs) > 0) {
+    stop("Please install required packages: ", paste(missing_pkgs, collapse = ", "))
+  }
+
+  # Avoid name collision in dplyr verbs
+  gene_id_arg <- gene_id
+
+  # 1) Find all transcripts for this gene
+  tx_ids <- LR_Tx_counts %>%
+    dplyr::filter(gene_id == gene_id_arg) %>%
+    dplyr::pull(feature_id)
+
+  if (length(tx_ids) == 0) {
+    stop("No transcripts found for gene: ", gene_id_arg)
+  }
+
+  # 2) Extract normalized counts for these transcripts (keep matrix shape even if one row)
+  norm_counts <- tryCatch(
+    {
+      counts(dds, normalized = TRUE)[tx_ids, , drop = FALSE]
+    },
+    error = function(e) {
+      stop("Error extracting normalized counts from `dds`: ", conditionMessage(e))
+    }
+  )
+
+  if (is.null(norm_counts) || nrow(norm_counts) == 0) {
+    stop("No rows returned from counts() for the requested transcripts.")
+  }
+
+  # optional log transform
+  if (isTRUE(log_transform)) {
+    norm_counts <- log10(norm_counts + 1)
+  }
+
+  # 3) Make a long data frame for ggplot
+  df <- as.data.frame(norm_counts) %>%
+    tibble::rownames_to_column("transcript") %>%
+    tidyr::pivot_longer(
+      cols = -transcript,
+      names_to = "sample",
+      values_to = "normalized_counts"
+    )
+
+  # 4) Add dose information
+  df <- df %>%
+    dplyr::mutate(
+      Dose = dplyr::case_when(
+        sample %in% dose_samples[["0Gy"]] ~ "0Gy",
+        sample %in% dose_samples[["4Gy"]] ~ "4Gy",
+        TRUE ~ "Other"
+      )
+    )
+
+  # preserve transcript order by total counts (descending)
+  transcript_order <- df %>%
+    dplyr::group_by(transcript) %>%
+    dplyr::summarise(total = sum(normalized_counts, na.rm = TRUE)) %>%
+    dplyr::arrange(dplyr::desc(total)) %>%
+    dplyr::pull(transcript)
+  df$transcript <- factor(df$transcript, levels = transcript_order)
+
+  # 5) Prepare title
+  if (is.null(title)) {
+    title <- paste0("Transcripts of gene ", gene_id_arg)
+    if (isTRUE(log_transform)) title <- paste0(title, " (log10+1)")
+  }
+
+  # 6) Plot barplot
+  p <- ggplot2::ggplot(df, ggplot2::aes(x = transcript, y = normalized_counts, fill = Dose)) +
+    ggplot2::geom_bar(stat = "identity", position = ggplot2::position_dodge(width = 0.9), ggplot2::aes(group = sample)) +
+    ggplot2::labs(
+      x = "Transcript",
+      y = ifelse(isTRUE(log_transform), "Normalized counts (log10+1)", "Normalized counts"),
+      title = title
+    ) +
+    ggplot2::scale_fill_manual(values = fill_colors) +
+    ggplot2::theme_classic() +
+    ggplot2::theme(
+      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
+      legend.position = "top"
+    )
+
+  return(p)
+}
+```
+
+### plot DTU results
+```{r}
+
+dds_tx<- DESeq(dds_tx)
+
+plot_dtu_transcripts("ENSG00000004455")
+#+ labs(title = "")
+
+```
+
 
 # Enrichment --> Kegg, GO, reactome
 
@@ -1134,7 +1331,16 @@ ggplot(summary_df, aes(x = tool, y = count, fill = label)) +
     y = "Count",
     fill = "Transcript Type"
   ) +
-  theme_minimal(base_size = 14)
+  theme_minimal(base_size = 20) +  theme(
+    plot.title   = element_text(size = 20, face = "bold"),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    axis.text.x  = element_text(size = 14),
+    axis.text.y  = element_text(size = 14),
+    legend.title = element_text(size = 16),
+    legend.text  = element_text(size = 14)
+  )
+
 ```
 
 # Session info
