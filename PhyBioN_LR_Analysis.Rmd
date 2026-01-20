@@ -663,7 +663,8 @@ plot_dtu_transcripts <- function(
   gene_id,
   LR_Tx_counts = LR_Tx_counts_filtered,
   dds = dds_tx,
-   exclude_transcripts = NULL, 
+  annotation_df = NULL,
+  exclude_transcripts = NULL, 
   dtu_result, 
   dose_samples = list(
     "0Gy" = c("0Gy-do1", "0Gy-do2", "0Gy-do3"),
@@ -675,6 +676,24 @@ plot_dtu_transcripts <- function(
 
   
   gene_id_arg <- gene_id
+  
+  gene_label <- gene_id_arg
+
+if (!is.null(annotation_df)) {
+  if (!all(c("gene_id", "gene_name") %in% colnames(annotation_df))) {
+    stop("`annotation_df` must contain columns: gene_id, gene_name")
+  }
+
+  mapped_name <- annotation_df %>%
+    dplyr::filter(gene_id == gene_id_arg) %>%
+    dplyr::pull(gene_name) %>%
+    unique()
+
+  if (length(mapped_name) >= 1 && !is.na(mapped_name[1])) {
+    gene_label <- mapped_name[1]
+  }
+}
+
 
   ## ---- 1) transcripts for gene ----
   tx_ids <- LR_Tx_counts %>%
@@ -743,9 +762,10 @@ plot_dtu_transcripts <- function(
 
   ## ---- 7) title ----
   if (is.null(title)) {
-    title <- paste0("DTU transcripts for gene ", gene_id_arg)
+    title <- paste0("DTU transcripts for gene ", gene_label)
     if (isTRUE(log_transform)) title <- paste0(title, " (log10+1)")
   }
+
 
   ## ---- 8) colors ----
   fill_colors <- c(
