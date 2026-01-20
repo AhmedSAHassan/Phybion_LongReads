@@ -250,7 +250,7 @@ anno_df <- get_annotation_orgdb(
 
 gene_plot <- plot_gene_modified(
   dds = dds_LR,
-  gene = c("ENSG00000124762"),
+  gene = c("ENSG00000008517"),
   intgroup = "Dose",
   annotation_obj = anno_df
 ) + ggpt
@@ -817,6 +817,14 @@ if (!is.null(annotation_df)) {
       axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
       legend.position = "top"
     )
+  
+  p <- p + theme(
+    plot.title   = element_text(size = 16, face = "bold", hjust = 0.5),
+    axis.title.x = element_text(size = 13, face = "bold"),
+    axis.title.y = element_text(size = 13, face = "bold"),
+    axis.text.x  = element_text(angle = 45, hjust = 1)
+  )
+
 
   return(p)
 }
@@ -828,7 +836,9 @@ if (!is.null(annotation_df)) {
 
 dds_tx<- DESeq(dds_tx)
 
-plot_dtu_transcripts("ENSG00000136156", dtu_result = ds.filtered) + labs(title = "DTU transcripts for ITM2B")
+plot_dtu_transcripts("ENSG00000004455", dtu_result = ds.filtered, annotation_df = anno_df)
+
+plot_dtu_transcripts("ENSG00000105372", exclude_transcripts = c("ENST00000221975", "ENST00000598742") , dtu_result = ds.filtered ,annotation_df = anno_df )
 
 ```
 
