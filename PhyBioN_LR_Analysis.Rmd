@@ -663,7 +663,8 @@ plot_dtu_transcripts <- function(
   gene_id,
   LR_Tx_counts = LR_Tx_counts_filtered,
   dds = dds_tx,
-  dtu_result,  # NEW ARGUMENT
+   exclude_transcripts = NULL, 
+  dtu_result, 
   dose_samples = list(
     "0Gy" = c("0Gy-do1", "0Gy-do2", "0Gy-do3"),
     "4Gy" = c("4Gy-do1", "4Gy-do2", "4Gy-do3")
@@ -679,6 +680,14 @@ plot_dtu_transcripts <- function(
   tx_ids <- LR_Tx_counts %>%
     dplyr::filter(gene_id == gene_id_arg) %>%
     dplyr::pull(feature_id)
+  
+  if (!is.null(exclude_transcripts)) {
+  tx_ids <- setdiff(tx_ids, exclude_transcripts)
+
+  if (length(tx_ids) == 0) {
+    stop("All transcripts were excluded for gene: ", gene_id_arg)
+  }
+}
 
   if (length(tx_ids) == 0) {
     stop("No transcripts found for gene: ", gene_id_arg)
