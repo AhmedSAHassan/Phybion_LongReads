@@ -652,7 +652,7 @@ ds.filtered <- ds.filtered %>%
 
 
 
-plotSplice(ex, geneid = "ENSG00000004455", genecolname = "gene_id", FDR = 0.05)
+plotSplice(ex, geneid = "ENSG00000133316", genecolname = "gene_id", FDR = 0.05)
 
 ```
 
@@ -663,25 +663,19 @@ plot_dtu_transcripts <- function(
   gene_id,
   LR_Tx_counts = LR_Tx_counts_filtered,
   dds = dds_tx,
+  dtu_result,  # NEW ARGUMENT
   dose_samples = list(
     "0Gy" = c("0Gy-do1", "0Gy-do2", "0Gy-do3"),
     "4Gy" = c("4Gy-do1", "4Gy-do2", "4Gy-do3")
   ),
   log_transform = FALSE,
-  title = NULL,
-  fill_colors = c("0Gy" = "grey", "4Gy" = "firebrick", "Other" = "lightblue")
+  title = NULL
 ) {
-  # Check required packages
-  required_pkgs <- c("dplyr", "tibble", "tidyr", "ggplot2")
-  missing_pkgs <- required_pkgs[!vapply(required_pkgs, requireNamespace, logical(1), quietly = TRUE)]
-  if (length(missing_pkgs) > 0) {
-    stop("Please install required packages: ", paste(missing_pkgs, collapse = ", "))
-  }
 
-  # Avoid name collision in dplyr verbs
+  
   gene_id_arg <- gene_id
 
-  # 1) Find all transcripts for this gene
+  ## ---- 1) transcripts for gene ----
   tx_ids <- LR_Tx_counts %>%
     dplyr::filter(gene_id == gene_id_arg) %>%
     dplyr::pull(feature_id)
@@ -690,26 +684,14 @@ plot_dtu_transcripts <- function(
     stop("No transcripts found for gene: ", gene_id_arg)
   }
 
-  # 2) Extract normalized counts for these transcripts (keep matrix shape even if one row)
-  norm_counts <- tryCatch(
-    {
-      counts(dds, normalized = TRUE)[tx_ids, , drop = FALSE]
-    },
-    error = function(e) {
-      stop("Error extracting normalized counts from `dds`: ", conditionMessage(e))
-    }
-  )
+  ## ---- 2) normalized counts ----
+  norm_counts <- counts(dds, normalized = TRUE)[tx_ids, , drop = FALSE]
 
-  if (is.null(norm_counts) || nrow(norm_counts) == 0) {
-    stop("No rows returned from counts() for the requested transcripts.")
-  }
-
-  # optional log transform
   if (isTRUE(log_transform)) {
     norm_counts <- log10(norm_counts + 1)
   }
 
-  # 3) Make a long data frame for ggplot
+  ## ---- 3) long dataframe ----
   df <- as.data.frame(norm_counts) %>%
     tibble::rownames_to_column("transcript") %>%
     tidyr::pivot_longer(
@@ -718,39 +700,89 @@ plot_dtu_transcripts <- function(
       values_to = "normalized_counts"
     )
 
-  # 4) Add dose information
+  ## ---- 4) dose info ----
   df <- df %>%
     dplyr::mutate(
       Dose = dplyr::case_when(
         sample %in% dose_samples[["0Gy"]] ~ "0Gy",
         sample %in% dose_samples[["4Gy"]] ~ "4Gy",
-        TRUE ~ "Other"
+        TRUE ~ NA_character_
       )
     )
 
-  # preserve transcript order by total counts (descending)
+  ## ---- 5) DTU significance ----
+  sig_tx <- unique(dtu_result$ensembl_transcript_id)
+
+  df <- df %>%
+    dplyr::mutate(
+      DTU_status = ifelse(
+        transcript %in% sig_tx,
+        "Significant",
+        "Not_significant"
+      ),
+      Fill_group = interaction(Dose, DTU_status, drop = TRUE)
+    )
+
+  ## ---- 6) transcript order ----
   transcript_order <- df %>%
     dplyr::group_by(transcript) %>%
     dplyr::summarise(total = sum(normalized_counts, na.rm = TRUE)) %>%
     dplyr::arrange(dplyr::desc(total)) %>%
     dplyr::pull(transcript)
+
   df$transcript <- factor(df$transcript, levels = transcript_order)
 
-  # 5) Prepare title
+  ## ---- 7) title ----
   if (is.null(title)) {
-    title <- paste0("Transcripts of gene ", gene_id_arg)
+    title <- paste0("DTU transcripts for gene ", gene_id_arg)
     if (isTRUE(log_transform)) title <- paste0(title, " (log10+1)")
   }
 
-  # 6) Plot barplot
-  p <- ggplot2::ggplot(df, ggplot2::aes(x = transcript, y = normalized_counts, fill = Dose)) +
-    ggplot2::geom_bar(stat = "identity", position = ggplot2::position_dodge(width = 0.9), ggplot2::aes(group = sample)) +
+  ## ---- 8) colors ----
+  fill_colors <- c(
+    "0Gy.Significant"     = "#2166AC",  # blue
+    "4Gy.Significant"     = "#B2182B",  # red
+    "0Gy.Not_significant" = "grey80",
+    "4Gy.Not_significant" = "grey40"
+  )
+
+  ## ---- 9) plot ----
+  p <- ggplot2::ggplot(
+    df,
+    ggplot2::aes(
+      x = transcript,
+      y = normalized_counts,
+      fill = Fill_group,
+      group = sample
+    )
+  ) +
+    ggplot2::geom_bar(
+      stat = "identity",
+      position = ggplot2::position_dodge(width = 0.9)
+    ) +
+    ggplot2::scale_fill_manual(
+      values = fill_colors,
+      breaks = c(
+        "0Gy.Significant",
+        "4Gy.Significant",
+        "0Gy.Not_significant",
+        "4Gy.Not_significant"
+      ),
+      labels = c(
+        "0Gy (DTU)",
+        "4Gy (DTU)",
+        "0Gy (not DTU)",
+        "4Gy (not DTU)"
+      ),
+      name = "Dose / DTU status"
+    ) +
     ggplot2::labs(
-      x = "Transcript",
-      y = ifelse(isTRUE(log_transform), "Normalized counts (log10+1)", "Normalized counts"),
+      x = "Transcript ID",
+      y = ifelse(log_transform,
+                 "Normalized counts (log10+1)",
+                 "Normalized counts"),
       title = title
     ) +
-    ggplot2::scale_fill_manual(values = fill_colors) +
     ggplot2::theme_classic() +
     ggplot2::theme(
       axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
@@ -759,6 +791,7 @@ plot_dtu_transcripts <- function(
 
   return(p)
 }
+
 ```
 
 ### plot DTU results
@@ -766,8 +799,7 @@ plot_dtu_transcripts <- function(
 
 dds_tx<- DESeq(dds_tx)
 
-plot_dtu_transcripts("ENSG00000004455")
-#+ labs(title = "")
+plot_dtu_transcripts("ENSG00000136156", dtu_result = ds.filtered) + labs(title = "DTU transcripts for ITM2B")
 
 ```
 
